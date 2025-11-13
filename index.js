@@ -9,6 +9,10 @@
   const BUTTON_SELECTOR = `.${BUTTON_CLASS}`;
   const PANEL_CLASS = "lu-chroma-panel";
   const PANEL_ID = "lu-chroma-panel-container";
+  const SKIN_SELECTORS = [
+    ".skin-name-text", // Classic Champ Select
+    ".skin-name",       // Swiftplay lobby
+  ];
 
   const CSS_RULES = `
     .${BUTTON_CLASS} {
@@ -423,6 +427,44 @@
     });
   }
 
+  function isVisible(element) {
+    if (!element) {
+      return false;
+    }
+    return element.offsetParent !== null;
+  }
+
+  function readCurrentSkinName() {
+    // Read skin name from the same location as skin monitor
+    for (const selector of SKIN_SELECTORS) {
+      const nodes = document.querySelectorAll(selector);
+      if (!nodes.length) {
+        continue;
+      }
+
+      let candidate = null;
+
+      nodes.forEach((node) => {
+        const name = node.textContent.trim();
+        if (!name) {
+          return;
+        }
+
+        if (isVisible(node)) {
+          candidate = name;
+        } else if (!candidate) {
+          candidate = name;
+        }
+      });
+
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   function getSkinOffset(skinItem) {
     // Check the skin item itself for offset class like "skin-carousel-offset-2"
     let offsetMatch = skinItem.className.match(/skin-carousel-offset-(\d+)/);
@@ -624,8 +666,9 @@
 
     const skinName = document.createElement("div");
     skinName.className = "child-skin-name";
-    // Try to get champion name from skin data or DOM
-    const displayName = skinData.name || 
+    // Fetch the actual skin name from the DOM (same location as skin monitor)
+    const displayName = readCurrentSkinName() || 
+                       skinData.name || 
                        skinData.championName || 
                        (skinData.championId ? `Champion ${skinData.championId}` : "Champion");
     skinName.textContent = displayName;
