@@ -137,6 +137,17 @@
       transition: 250ms all cubic-bezier(0.02, 0.85, 0.08, 0.99);
     }
     
+    /* Target the caret/notch element to be above the border */
+    .${PANEL_CLASS} .flyout .caret,
+    .${PANEL_CLASS} .flyout [class*="caret"],
+    .${PANEL_CLASS} lol-uikit-flyout-frame .caret,
+    .${PANEL_CLASS} lol-uikit-flyout-frame [class*="caret"],
+    .${PANEL_CLASS} .flyout::part(caret),
+    .${PANEL_CLASS} lol-uikit-flyout-frame::part(caret) {
+      z-index: 3 !important;
+      position: relative;
+    }
+    
     .${PANEL_CLASS} .border {
       position: absolute;
       top: 0;
@@ -145,8 +156,12 @@
       background-color: transparent;
       box-shadow: 0 0 0 1px rgba(1,10,19,0.48);
       transition: 250ms all cubic-bezier(0.02, 0.85, 0.08, 0.99);
-      border: 2px solid transparent;
+      border-top: 2px solid transparent;
+      border-left: 2px solid transparent;
+      border-right: 2px solid transparent;
+      border-bottom: none;
       border-image: linear-gradient(to top, #785a28 0, #463714 50%, #463714 100%) 1 stretch;
+      border-image-slice: 1 1 0 1;
       width: 100%;
       height: 100%;
       visibility: visible;
@@ -910,7 +925,7 @@
     // Position above the button with some spacing
     // Official positioning shows the flyout above the button
     // Adjusted 5px higher than default
-    const flyoutTop = rect.top - flyoutRect.height - 13;
+    const flyoutTop = rect.top - flyoutRect.height - 15;
 
     // Set the flyout frame positioning to match official style
     // Official: position: absolute; overflow: visible; top: 178px; left: 486.5px;
