@@ -139,7 +139,7 @@
     .${PANEL_CLASS} .border {
       position: absolute;
       box-sizing: border-box;
-      background-color: #010a13;
+      background-color: transparent;
       box-shadow: 0 0 0 1px rgba(1,10,19,0.48);
       transition: 250ms all cubic-bezier(0.02, 0.85, 0.08, 0.99);
       border: 2px solid transparent;
@@ -147,6 +147,8 @@
       width: 100%;
       height: 100%;
       visibility: visible;
+      z-index: 0;
+      pointer-events: none;
     }
     
     .${PANEL_CLASS} .lc-flyout-content {
@@ -160,6 +162,7 @@
       height: 315px;
       position: relative;
       width: 100%;
+      z-index: 1;
     }
 
     .${PANEL_CLASS} .chroma-information-image {
@@ -200,6 +203,8 @@
       min-height: 40px;
       padding: 7px 0;
       width: 100%;
+      position: relative;
+      z-index: 1;
     }
 
     .${PANEL_CLASS} .chroma-skin-button {
@@ -703,7 +708,12 @@
     panel.id = PANEL_ID;
     panel.className = PANEL_CLASS;
     panel.style.position = "fixed";
+    panel.style.top = "0";
+    panel.style.left = "0";
+    panel.style.width = "100%";
+    panel.style.height = "100%";
     panel.style.zIndex = "10000";
+    panel.style.pointerEvents = "none"; // Panel container doesn't capture events, only flyout does
 
     // Create flyout frame structure (or use simple div if custom elements don't work)
     let flyoutFrame;
@@ -711,12 +721,21 @@
       flyoutFrame = document.createElement("lol-uikit-flyout-frame");
       flyoutFrame.className = "flyout";
       flyoutFrame.setAttribute("orientation", "top");
+      flyoutFrame.setAttribute("animated", "false");
+      flyoutFrame.setAttribute("caretoffset", "undefined");
+      flyoutFrame.setAttribute("borderless", "undefined");
+      flyoutFrame.setAttribute("caretless", "undefined");
       flyoutFrame.setAttribute("show", "true");
     } catch (e) {
       log.debug("Could not create custom element, using div", e);
       flyoutFrame = document.createElement("div");
       flyoutFrame.className = "flyout";
     }
+
+    // Set initial flyout frame styles to match official positioning
+    flyoutFrame.style.position = "absolute";
+    flyoutFrame.style.overflow = "visible";
+    flyoutFrame.style.pointerEvents = "all";
 
     let flyoutContent;
     try {
@@ -863,29 +882,59 @@
       return;
     }
 
-    const rect = buttonElement.getBoundingClientRect();
-    let panelRect = panel.getBoundingClientRect();
-
-    // If panel hasn't been rendered yet, use estimated dimensions
-    if (panelRect.width === 0) {
-      panelRect = { width: 300, height: 300 };
+    // Find the flyout frame element inside the panel
+    const flyoutFrame = panel.querySelector(".flyout");
+    if (!flyoutFrame) {
+      log.warn("Cannot position panel: flyout frame not found");
+      return;
     }
 
-    // Position above the button, centered
-    const top = rect.top - panelRect.height - 10;
-    const left = rect.left + rect.width / 2 - panelRect.width / 2;
+    const rect = buttonElement.getBoundingClientRect();
+    let flyoutRect = flyoutFrame.getBoundingClientRect();
 
-    panel.style.top = `${Math.max(10, top)}px`;
-    panel.style.left = `${Math.max(
+    // If flyout hasn't been rendered yet, use estimated dimensions
+    if (flyoutRect.width === 0) {
+      flyoutRect = { width: 305, height: 420 };
+    }
+
+    // Calculate position relative to button to match official flyout positioning
+    // Official flyout is positioned at top: 178px, left: 486.5px relative to the viewport
+    // We need to position it relative to the button's position
+    // The flyout should appear above the button, centered horizontally
+    const buttonCenterX = rect.left + rect.width / 2;
+    const flyoutLeft = buttonCenterX - flyoutRect.width / 2;
+
+    // Position above the button with some spacing
+    // Official positioning shows the flyout above the button
+    // Adjusted 5px higher than default
+    const flyoutTop = rect.top - flyoutRect.height - 13;
+
+    // Set the flyout frame positioning to match official style
+    // Official: position: absolute; overflow: visible; top: 178px; left: 486.5px;
+    flyoutFrame.style.position = "absolute";
+    flyoutFrame.style.overflow = "visible";
+    flyoutFrame.style.top = `${Math.max(10, flyoutTop)}px`;
+    flyoutFrame.style.left = `${Math.max(
       10,
-      Math.min(left, window.innerWidth - panelRect.width - 10)
+      Math.min(flyoutLeft, window.innerWidth - flyoutRect.width - 10)
     )}px`;
 
-    log.debug("Panel positioned", {
-      top: panel.style.top,
-      left: panel.style.left,
-      rect,
-      panelRect,
+    // Ensure panel container doesn't interfere with positioning
+    panel.style.position = "fixed";
+    panel.style.top = "0";
+    panel.style.left = "0";
+    panel.style.width = "100%";
+    panel.style.height = "100%";
+    panel.style.pointerEvents = "none";
+
+    // Make flyout frame interactive
+    flyoutFrame.style.pointerEvents = "all";
+
+    log.debug("Flyout frame positioned", {
+      top: flyoutFrame.style.top,
+      left: flyoutFrame.style.left,
+      buttonRect: rect,
+      flyoutRect: flyoutRect,
     });
   }
 
