@@ -117,6 +117,7 @@
       flex-direction: column;
       width: 305px;
       position: relative;
+      z-index: 0;
     }
     
     .${PANEL_CLASS} .chroma-modal.chroma-view {
@@ -138,6 +139,8 @@
     
     .${PANEL_CLASS} .border {
       position: absolute;
+      top: 0;
+      left: 0;
       box-sizing: border-box;
       background-color: transparent;
       box-shadow: 0 0 0 1px rgba(1,10,19,0.48);
@@ -147,7 +150,7 @@
       width: 100%;
       height: 100%;
       visibility: visible;
-      z-index: 0;
+      z-index: 2;
       pointer-events: none;
     }
     
