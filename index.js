@@ -616,9 +616,10 @@
     chromaImage.className = "chroma-information-image";
     if (chromas.length > 0 && chromas[0].imagePath) {
       chromaImage.style.backgroundImage = `url('${chromas[0].imagePath}')`;
+      chromaImage.style.display = ""; // Ensure it's visible
     } else {
-      // Fallback background color
-      chromaImage.style.backgroundColor = "#1e2328";
+      // Hide the image element when no image is available
+      chromaImage.style.display = "none";
     }
 
     const skinName = document.createElement("div");
@@ -752,6 +753,9 @@
     // Update preview image
     if (chroma.imagePath) {
       chromaImage.style.backgroundImage = `url('${chroma.imagePath}')`;
+      chromaImage.style.display = ""; // Show the element
+    } else {
+      chromaImage.style.display = "none"; // Hide when no image
     }
 
     // Try to set the skin via API
