@@ -286,13 +286,11 @@
       pointer-events: all;
       align-items: center;
       border-radius: 50%;
-      box-shadow: 0 0 2px #010a13;
       display: flex;
       height: 26px;
       justify-content: center;
       width: 26px;
       cursor: pointer;
-      transition: all 0.2s;
     }
 
     .${PANEL_CLASS}[data-no-button] .chroma-skin-button {
@@ -304,49 +302,34 @@
       cursor: pointer;
     }
 
-    .${PANEL_CLASS} .chroma-skin-button.locked {
-      cursor: not-allowed;
-    }
-
-    .${PANEL_CLASS} .chroma-skin-button:hover {
-      transform: scale(1.1);
-    }
-
-    .${PANEL_CLASS} .chroma-skin-button.selected {
-      background: linear-gradient(180deg,#c89b3c 0,#916c30 33%,#c89b3c 75%,#cdbe91);
-      color: #c89b3c;
+    .${PANEL_CLASS} .chroma-skin-button.selected .contents {
+      /* Selected state: add thin gold border */
+      border: 1px solid #c89b3c;
     }
 
     .${PANEL_CLASS} .chroma-skin-button.locked {
-      opacity: 0.5;
-      cursor: not-allowed;
-      filter: grayscale(100%);
+      opacity: 0.6;
+      cursor: pointer;
+      /* Keep colors visible but dimmed, don't use grayscale */
     }
 
     .${PANEL_CLASS} .chroma-skin-button .contents {
       align-items: center;
-      background: linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2);
-      border: 2px solid #010a13;
       border-radius: 50%;
       display: flex;
       height: 18px;
       justify-content: center;
       width: 18px;
+      /* Background will be set inline based on chroma color */
     }
     
-    .${PANEL_CLASS} .chroma-skin-button.locked {
-      background: url(/fe/lol-champ-select/images/config/skin-carousel-locked.png) no-repeat;
-      background-size: contain;
-      cursor: pointer;
-      pointer-events: all;
-    }
-    
+    /* Locked buttons show colors with reduced opacity, no background image override */
     .${PANEL_CLASS} .chroma-skin-button.locked:hover:not([purchase-disabled]) {
-      background-image: url(/fe/lol-champ-select/images/config/skin-carousel-locked-hover.png);
+      opacity: 0.8;
     }
     
     .${PANEL_CLASS} .chroma-skin-button.locked.purchase-disabled {
-      background-image: url(/fe/lol-champ-select/images/config/skin-carousel-locked-inactive.png);
+      opacity: 0.4;
       pointer-events: none;
     }
   `;
@@ -1618,27 +1601,44 @@
       const contents = document.createElement("div");
       contents.className = "contents";
       
-      // Use chroma color if available, otherwise fall back to image
-      const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
-      if (primaryColor) {
-        // Ensure color has # prefix
-        const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
-        // Use gradient background matching official League style
-        // Official League uses: linear-gradient(135deg, #COLOR 0%, #COLOR 50%, #COLOR 50%, #COLOR 100%)
-        contents.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
+      // Check if this is the base/default skin button
+      const isDefaultButton = chroma.name === "Default" && !chroma.primaryColor && !chroma.colors?.length;
+      
+      if (isDefaultButton) {
+        // Base/default button: use the original gradient (beige with red stripe) - matching official League
+        contents.style.background = "linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2)";
         contents.style.backgroundSize = "cover";
         contents.style.backgroundPosition = "center";
         contents.style.backgroundRepeat = "no-repeat";
-        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
-      } else if (chroma.imagePath) {
-        // Fall back to image if no color available
-        contents.style.background = `url('${chroma.imagePath}')`;
-        contents.style.backgroundSize = "cover";
-        contents.style.backgroundPosition = "center";
-        contents.style.backgroundRepeat = "no-repeat";
-        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath}`);
+        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using default gradient`);
       } else {
-        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - no color or image`);
+        // Chroma buttons: use chroma color if available, otherwise fall back to image
+        const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
+        if (primaryColor) {
+          // Ensure color has # prefix
+          const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
+          // Use gradient background matching official League style
+          // Official League uses: linear-gradient(135deg, #COLOR 0%, #COLOR 50%, #COLOR 50%, #COLOR 100%)
+          contents.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
+          contents.style.backgroundSize = "cover";
+          contents.style.backgroundPosition = "center";
+          contents.style.backgroundRepeat = "no-repeat";
+          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
+        } else if (chroma.imagePath) {
+          // Fall back to image if no color available
+          contents.style.background = `url('${chroma.imagePath}')`;
+          contents.style.backgroundSize = "cover";
+          contents.style.backgroundPosition = "center";
+          contents.style.backgroundRepeat = "no-repeat";
+          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath}`);
+        } else {
+          // Default fallback color if no color or image is available
+          contents.style.background = "linear-gradient(135deg, #f0e6d2 0%, #f0e6d2 50%, #f0e6d2 50%, #f0e6d2 100%)";
+          contents.style.backgroundSize = "cover";
+          contents.style.backgroundPosition = "center";
+          contents.style.backgroundRepeat = "no-repeat";
+          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - no color or image, using default`);
+        }
       }
 
       chromaButton.appendChild(contents);
