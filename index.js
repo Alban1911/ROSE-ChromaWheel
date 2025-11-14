@@ -286,11 +286,15 @@
       pointer-events: all;
       align-items: center;
       border-radius: 50%;
+      border: none; /* No default border to ensure proper centering */
       display: flex;
       height: 26px;
       justify-content: center;
+      margin: 0; /* Ensure no margin affects centering */
+      padding: 0; /* Ensure no padding affects centering */
       width: 26px;
       cursor: pointer;
+      box-sizing: border-box; /* Consistent box model */
     }
 
     .${PANEL_CLASS}[data-no-button] .chroma-skin-button {
@@ -303,14 +307,16 @@
       opacity: 1 !important; /* Always 100% opacity for non-locked buttons */
     }
 
-    .${PANEL_CLASS} .chroma-skin-button.selected {
-      /* Selected state: 2px golden border around the button */
+    .${PANEL_CLASS} .chroma-skin-button.selected,
+    .${PANEL_CLASS} .chroma-skin-button:hover {
+      /* Selected and hover states: 2px golden border around the button */
       border: 2px solid #c89b3c;
       box-sizing: border-box;
       /* Border is inside the 26px, so inner space is 22px */
     }
     
-    .${PANEL_CLASS} .chroma-skin-button.selected .contents {
+    .${PANEL_CLASS} .chroma-skin-button.selected .contents,
+    .${PANEL_CLASS} .chroma-skin-button:hover .contents {
       /* Create 2px gap on each side: 22px inner - 4px gap = 18px contents */
       height: 18px;
       width: 18px;
