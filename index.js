@@ -478,26 +478,61 @@
     }
   }
 
+  function isCurrentSkinItem(skinItem) {
+    if (!skinItem) {
+      return false;
+    }
+
+    // Carousel items: rely on offset 2 (center/current slot)
+    if (skinItem.classList.contains("skin-selection-item")) {
+      const offset = getSkinOffset(skinItem);
+      if (offset === 2) {
+        return true;
+      }
+    }
+
+    // Thumbnail wrappers (e.g., Swiftplay lobby) typically flag selection via attributes/classes
+    if (skinItem.classList.contains("thumbnail-wrapper")) {
+      if (
+        skinItem.classList.contains("selected") ||
+        skinItem.getAttribute("aria-selected") === "true"
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function ensureFakeButton(skinItem) {
     if (!skinItem) {
       return;
     }
 
+    const shouldAttachButton = isCurrentSkinItem(skinItem);
+
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
-    if (existingButton) {
-      log.debug("Button already exists for skin item");
+    if (!shouldAttachButton) {
+      if (existingButton) {
+        existingButton.remove();
+        log.debug("Removed chroma button from non-current skin item");
+      }
       return;
     }
 
     // Create and inject the fake button
     try {
-      const fakeButton = createFakeButton();
-      skinItem.appendChild(fakeButton);
-      log.debug("Created fake chroma button for skin item", skinItem);
+      if (!existingButton) {
+        const fakeButton = createFakeButton();
+        skinItem.appendChild(fakeButton);
+        existingButton = fakeButton;
+        log.debug("Created fake chroma button for skin item", skinItem);
+      } else {
+        log.debug("Button already exists for current skin item");
+      }
 
-      // Set initial visibility
-      updateButtonVisibility(fakeButton);
+      updateButtonVisibility(existingButton);
     } catch (e) {
       log.warn("Failed to create chroma button", e);
     }
