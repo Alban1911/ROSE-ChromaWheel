@@ -300,6 +300,7 @@
 
     .${PANEL_CLASS} .chroma-skin-button:not(.locked) {
       cursor: pointer;
+      opacity: 1 !important; /* Always 100% opacity for non-locked buttons */
     }
 
     .${PANEL_CLASS} .chroma-skin-button.selected {
@@ -316,9 +317,9 @@
     }
 
     .${PANEL_CLASS} .chroma-skin-button.locked {
-      opacity: 0.6;
+      opacity: 1 !important; /* All buttons at 100% opacity, including locked */
       cursor: pointer;
-      /* Keep colors visible but dimmed, don't use grayscale */
+      /* Keep colors visible, no opacity reduction */
     }
 
     .${PANEL_CLASS} .chroma-skin-button .contents {
@@ -328,16 +329,17 @@
       height: 18px;
       justify-content: center;
       width: 18px;
+      opacity: 1 !important; /* All button contents at 100% opacity always */
       /* Background will be set inline based on chroma color */
     }
     
-    /* Locked buttons show colors with reduced opacity, no background image override */
+    /* All buttons at 100% opacity, no variation on hover or state */
     .${PANEL_CLASS} .chroma-skin-button.locked:hover:not([purchase-disabled]) {
-      opacity: 0.8;
+      opacity: 1 !important;
     }
     
     .${PANEL_CLASS} .chroma-skin-button.locked.purchase-disabled {
-      opacity: 0.4;
+      opacity: 1 !important;
       pointer-events: none;
     }
   `;
