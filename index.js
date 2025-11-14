@@ -38,6 +38,13 @@
       z-index: 10;
     }
 
+    .${BUTTON_CLASS}[data-hidden],
+    .${BUTTON_CLASS}[data-hidden] * {
+      pointer-events: none !important;
+      cursor: default !important;
+      visibility: hidden !important;
+    }
+
     .${BUTTON_CLASS} .outer-mask {
       pointer-events: auto;
       -webkit-user-select: none;
@@ -119,6 +126,16 @@
       -webkit-user-select: none;
     }
 
+    .${PANEL_CLASS}[data-no-button] {
+      pointer-events: none;
+      cursor: default !important;
+    }
+
+    .${PANEL_CLASS}[data-no-button] * {
+      pointer-events: none !important;
+      cursor: default !important;
+    }
+
     .${PANEL_CLASS} .chroma-modal {
       background: #000;
       display: flex;
@@ -138,6 +155,11 @@
       overflow: visible;
       pointer-events: all;
       -webkit-user-select: none;
+    }
+
+    .${PANEL_CLASS}[data-no-button] .flyout {
+      pointer-events: none !important;
+      cursor: default !important;
     }
     
     .${PANEL_CLASS} .flyout-frame {
@@ -233,6 +255,11 @@
       z-index: 1;
     }
 
+    .${PANEL_CLASS}[data-no-button] .chroma-selection {
+      pointer-events: none;
+      cursor: default;
+    }
+
     .${PANEL_CLASS} .chroma-selection ul {
       list-style: none;
       margin: 0;
@@ -266,6 +293,19 @@
       width: 26px;
       cursor: pointer;
       transition: all 0.2s;
+    }
+
+    .${PANEL_CLASS}[data-no-button] .chroma-skin-button {
+      pointer-events: none !important;
+      cursor: default !important;
+    }
+
+    .${PANEL_CLASS} .chroma-skin-button:not(.locked) {
+      cursor: pointer;
+    }
+
+    .${PANEL_CLASS} .chroma-skin-button.locked {
+      cursor: not-allowed;
     }
 
     .${PANEL_CLASS} .chroma-skin-button:hover {
@@ -900,12 +940,48 @@
     
     if (shouldShow) {
       button.style.display = "block";
+      button.style.visibility = "visible";
       button.style.pointerEvents = "auto";
       button.style.opacity = "1";
+      button.style.cursor = "pointer";
+      button.removeAttribute("data-hidden");
+      // Re-enable pointer events on all children
+      const children = button.querySelectorAll("*");
+      children.forEach(child => {
+        child.style.pointerEvents = "";
+        child.style.cursor = "";
+        child.style.visibility = "";
+      });
     } else {
       button.style.display = "none";
+      button.style.visibility = "hidden";
       button.style.pointerEvents = "none";
       button.style.opacity = "0";
+      button.style.cursor = "default";
+      button.setAttribute("data-hidden", "true");
+      
+      // Disable pointer events on all children to prevent any hover effects
+      const children = button.querySelectorAll("*");
+      children.forEach(child => {
+        child.style.pointerEvents = "none";
+        child.style.cursor = "default";
+        child.style.visibility = "hidden";
+      });
+      
+      // Close and disable any open panel when button becomes hidden
+      const existingPanel = document.getElementById(PANEL_ID);
+      if (existingPanel) {
+        log.info("[ChromaWheel] Button hidden, closing panel and marking as non-interactive");
+        existingPanel.setAttribute("data-no-button", "true");
+        existingPanel.style.pointerEvents = "none";
+        existingPanel.style.cursor = "default";
+        // Remove the panel after a short delay to allow any animations
+        setTimeout(() => {
+          if (existingPanel.parentNode) {
+            existingPanel.remove();
+          }
+        }, 100);
+      }
     }
   }
 
@@ -1361,6 +1437,21 @@
     log.info(`[ChromaWheel] createChromaPanel called with ${chromas.length} chromas`);
     log.debug("createChromaPanel details:", { skinData, chromas, buttonElement });
 
+    // Ensure button element exists and is valid before creating panel
+    if (!buttonElement) {
+      log.warn("[ChromaWheel] Cannot create panel: button element not provided");
+      return;
+    }
+
+    // Verify button is visible
+    const buttonVisible = buttonElement.offsetParent !== null && 
+                         buttonElement.style.display !== "none" &&
+                         buttonElement.style.opacity !== "0";
+    if (!buttonVisible) {
+      log.warn("[ChromaWheel] Cannot create panel: button element not visible");
+      return;
+    }
+
     // Remove existing panel if any
     const existingPanel = document.getElementById(PANEL_ID);
     if (existingPanel) {
@@ -1377,6 +1468,11 @@
     panel.style.height = "100%";
     panel.style.zIndex = "10000";
     panel.style.pointerEvents = "none"; // Panel container doesn't capture events, only flyout does
+    // Only set default cursor if button isn't present - otherwise allow normal interaction
+    if (!buttonElement || !buttonVisible) {
+      panel.setAttribute("data-no-button", "true");
+      panel.style.cursor = "default";
+    }
 
     // Create flyout frame structure (or use simple div if custom elements don't work)
     let flyoutFrame;
@@ -1399,6 +1495,11 @@
     flyoutFrame.style.position = "absolute";
     flyoutFrame.style.overflow = "visible";
     flyoutFrame.style.pointerEvents = "all";
+    // Only set default cursor if button isn't present - otherwise allow normal interaction
+    if (!buttonElement || !buttonVisible) {
+      flyoutFrame.style.pointerEvents = "none";
+      flyoutFrame.style.cursor = "default";
+    }
 
     let flyoutContent;
     try {
@@ -1720,6 +1821,24 @@
 
   function toggleChromaPanel(buttonElement, skinItem) {
     log.info("[ChromaWheel] toggleChromaPanel called");
+
+    // Check if chroma button exists and is visible before allowing panel to open
+    if (!buttonElement) {
+      log.warn("[ChromaWheel] Cannot open panel: chroma button element not provided");
+      return;
+    }
+
+    // Verify the button is actually visible and has chromas
+    const buttonVisible = buttonElement.offsetParent !== null && 
+                         buttonElement.style.display !== "none" &&
+                         buttonElement.style.opacity !== "0";
+    const hasChromas = skinMonitorState?.hasChromas || 
+                      buttonElement._luLastVisibilityState === true;
+
+    if (!buttonVisible || !hasChromas) {
+      log.warn("[ChromaWheel] Cannot open panel: chroma button not visible or no chromas");
+      return;
+    }
 
     const existingPanel = document.getElementById(PANEL_ID);
     if (existingPanel) {
