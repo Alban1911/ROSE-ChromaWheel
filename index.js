@@ -838,18 +838,23 @@
     return false;
   }
 
-  function shouldShowChromaButton() {
-    // In Swiftplay, always show
-    if (isSwiftplayMode()) {
-      return true;
-    }
-
-    // Otherwise, only show if session is initialized
-    return isSessionInitialized();
-  }
-
   function updateButtonVisibility(button, hasChromas) {
-    const shouldShow = shouldShowChromaButton() && Boolean(hasChromas);
+    if (!button) return;
+    
+    const shouldShow = Boolean(hasChromas);
+    const lastState = button._luLastVisibilityState;
+    const willChange = lastState === undefined || lastState !== shouldShow;
+    
+    // Only log when visibility actually changes
+    if (willChange) {
+      emitBridgeLog("button_visibility_update", {
+        shouldShow,
+        hasChromas,
+        buttonExists: true,
+      });
+      button._luLastVisibilityState = shouldShow;
+    }
+    
     if (shouldShow) {
       button.style.display = "block";
       button.style.pointerEvents = "auto";
@@ -908,14 +913,6 @@
     const isCurrent = isCurrentSkinItem(skinItem);
     const hasChromas = Boolean(skinMonitorState?.hasChromas);
 
-    if (isCurrent) {
-      emitBridgeLog("current_skin_eval", {
-        stateSkinId: skinMonitorState?.skinId ?? null,
-        hasChromas,
-        elementClasses: skinItem.className,
-      });
-    }
-
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
     if (!isCurrent) {
@@ -925,41 +922,64 @@
       return;
     }
 
+    // Only log current skin eval when skin actually changes
+    const lastEval = ensureFakeButton._lastEval;
+    const currentSkinId = skinMonitorState?.skinId ?? null;
+    if (!lastEval || lastEval.skinId !== currentSkinId || lastEval.hasChromas !== hasChromas) {
+      emitBridgeLog("current_skin_eval", {
+        stateSkinId: currentSkinId,
+        hasChromas,
+        elementClasses: skinItem.className,
+      });
+      ensureFakeButton._lastEval = { skinId: currentSkinId, hasChromas };
+    }
+
     // Create and inject the fake button
     try {
       if (!existingButton) {
         const fakeButton = createFakeButton();
         skinItem.appendChild(fakeButton);
         existingButton = fakeButton;
+        emitBridgeLog("button_created", {
+          skinId: currentSkinId,
+          hasChromas,
+        });
       }
 
       updateButtonVisibility(existingButton, hasChromas);
     } catch (e) {
       log.warn("Failed to create chroma button", e);
+      emitBridgeLog("button_creation_error", { error: String(e) });
     }
   }
 
   function scanSkinSelection() {
     const skinItems = document.querySelectorAll(".skin-selection-item");
+    const thumbnailWrappers = document.querySelectorAll(".thumbnail-wrapper");
+    
+    // Only log when state actually changes
+    const prevState = scanSkinSelection._lastState;
+    const currentState = {
+      skinItemsCount: skinItems.length,
+      currentSkinId: skinMonitorState?.skinId,
+      hasChromas: skinMonitorState?.hasChromas,
+    };
+    if (!prevState || 
+        prevState.currentSkinId !== currentState.currentSkinId ||
+        prevState.hasChromas !== currentState.hasChromas) {
+      emitBridgeLog("scan_skin_selection", {
+        ...currentState,
+        thumbnailWrappersCount: thumbnailWrappers.length,
+      });
+      scanSkinSelection._lastState = currentState;
+    }
+    
     skinItems.forEach((skinItem) => {
       ensureFakeButton(skinItem);
     });
 
-    const thumbnailWrappers = document.querySelectorAll(".thumbnail-wrapper");
     thumbnailWrappers.forEach((thumbnailWrapper) => {
       ensureFakeButton(thumbnailWrapper);
-    });
-
-    // Update visibility of all existing buttons
-    const existingButtons = document.querySelectorAll(BUTTON_SELECTOR);
-    existingButtons.forEach((button) => {
-      const hostItem = getSkinItemFromButton(button);
-      const matchesSkin =
-        hostItem && doesSkinItemMatchSkinState(hostItem);
-      updateButtonVisibility(
-        button,
-        matchesSkin && Boolean(skinMonitorState?.hasChromas)
-      );
     });
   }
 
@@ -1555,19 +1575,10 @@
     // Periodic scan as safety net
     const intervalId = setInterval(scanSkinSelection, 500);
 
-    // Periodic visibility update for all buttons
-    const visibilityCheckInterval = setInterval(() => {
-      const buttons = document.querySelectorAll(BUTTON_SELECTOR);
-      buttons.forEach((button) => {
-        updateButtonVisibility(button);
-      });
-    }, 500);
-
     // Return cleanup function
     return () => {
       observer.disconnect();
       clearInterval(intervalId);
-      clearInterval(visibilityCheckInterval);
     };
   }
 
