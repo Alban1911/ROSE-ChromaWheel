@@ -13,6 +13,14 @@
     ".skin-name-text", // Classic Champ Select
     ".skin-name", // Swiftplay lobby
   ];
+  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 145070, 103085]);
+  const SPECIAL_CHROMA_SKIN_IDS = new Set([145071, 100001, 103086, 88888]);
+  const chromaParentMap = new Map();
+  let skinMonitorState = null;
+  const championSkinCache = new Map(); // championId -> Map(skinId -> skin data)
+  const skinChromaCache = new Map(); // skinId -> boolean
+  const skinToChampionMap = new Map(); // skinId -> championId
+  const pendingChampionRequests = new Map(); // championId -> Promise
 
   const CSS_RULES = `
     .${BUTTON_CLASS} {
@@ -287,6 +295,381 @@
     debug: (msg, extra) => console.debug(`${LOG_PREFIX} ${msg}`, extra ?? ""),
   };
 
+  function emitBridgeLog(event, data = {}) {
+    try {
+      const emitter = window?.__leagueUnlockedBridgeEmit;
+      if (typeof emitter !== "function") {
+        return;
+      }
+      emitter({
+        type: "chroma-log",
+        source: "LU-ChromaWheel",
+        event,
+        data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      log.debug("Failed to emit bridge log", error);
+    }
+  }
+
+  function getNumericId(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = parseInt(value, 10);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  function extractSkinIdFromData(skinData) {
+    if (!skinData || typeof skinData !== "object") {
+      return null;
+    }
+    const candidates = [
+      skinData.skinId,
+      skinData.id,
+      skinData.skin?.skinId,
+      skinData.skin?.id,
+      skinData.championSkinId,
+      skinData.parentSkinId,
+    ];
+    for (const candidate of candidates) {
+      const numeric = getNumericId(candidate);
+      if (numeric !== null) {
+        return numeric;
+      }
+    }
+    return null;
+  }
+
+  function extractSkinIdFromElement(element) {
+    if (!element) {
+      return null;
+    }
+    const direct = element.getAttribute?.("data-skin-id");
+    if (direct) {
+      return getNumericId(direct);
+    }
+    const nested = element
+      .querySelector?.("[data-skin-id]")
+      ?.getAttribute("data-skin-id");
+    if (nested) {
+      return getNumericId(nested);
+    }
+    return null;
+  }
+
+  function getSkinIdFromContext(skinData, element) {
+    return extractSkinIdFromData(skinData) ?? extractSkinIdFromElement(element);
+  }
+
+  function getChampionIdFromContext(skinData, skinId, element) {
+    if (skinData && Number.isFinite(skinData.championId)) {
+      return skinData.championId;
+    }
+
+    if (element?.dataset?.championId) {
+      const attrId = getNumericId(element.dataset.championId);
+      if (Number.isFinite(attrId)) {
+        return attrId;
+      }
+    }
+
+    const championElement = element?.closest?.("[data-champion-id]");
+    if (championElement) {
+      const attrId = getNumericId(
+        championElement.getAttribute("data-champion-id")
+      );
+      if (Number.isFinite(attrId)) {
+        return attrId;
+      }
+    }
+
+    if (Number.isFinite(skinId)) {
+      const mappedChampion = skinToChampionMap.get(skinId);
+      if (Number.isFinite(mappedChampion)) {
+        return mappedChampion;
+      }
+
+      const inferred = Math.floor(skinId / 1000);
+      if (Number.isFinite(inferred) && inferred > 0) {
+        return inferred;
+      }
+    }
+
+    return null;
+  }
+
+  function isElementalistFormSkinId(skinId) {
+    return Number.isFinite(skinId) && skinId >= 99991 && skinId <= 99999;
+  }
+
+  function isSpecialBaseSkin(skinId) {
+    return (
+      Number.isFinite(skinId) &&
+      (SPECIAL_BASE_SKIN_IDS.has(skinId) || skinId === 99007)
+    );
+  }
+
+  function isSpecialChromaSkin(skinId) {
+    return (
+      Number.isFinite(skinId) &&
+      (SPECIAL_CHROMA_SKIN_IDS.has(skinId) || isElementalistFormSkinId(skinId))
+    );
+  }
+
+  function isLikelyChromaId(skinId) {
+    if (!Number.isFinite(skinId)) {
+      return false;
+    }
+    if (isSpecialChromaSkin(skinId)) {
+      return true;
+    }
+    if (chromaParentMap.has(skinId)) {
+      return true;
+    }
+    return skinId >= 1000000;
+  }
+
+  function getChildSkinsFromData(skinData) {
+    if (!skinData || typeof skinData !== "object") {
+      return [];
+    }
+
+    const candidates = [
+      skinData.childSkins,
+      skinData.skin?.childSkins,
+      skinData.skin?.chromas,
+      Array.isArray(skinData.chromas) ? skinData.chromas : null,
+      skinData.chromaDetails,
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate) && candidate.length > 0) {
+        return candidate;
+      }
+    }
+
+    return [];
+  }
+
+  function markSkinHasChromas(skinId, hasChromas) {
+    const numericId = getNumericId(skinId);
+    if (!Number.isFinite(numericId)) {
+      return;
+    }
+    skinChromaCache.set(numericId, Boolean(hasChromas));
+  }
+
+  function registerChromaChildren(baseSkinId, childSkins) {
+    const numericBaseId = getNumericId(baseSkinId);
+    if (!Number.isFinite(numericBaseId) || !Array.isArray(childSkins)) {
+      return;
+    }
+    markSkinHasChromas(numericBaseId, true);
+    childSkins.forEach((child) => {
+      const childId = extractSkinIdFromData(child);
+      if (Number.isFinite(childId)) {
+        chromaParentMap.set(childId, numericBaseId);
+        markSkinHasChromas(childId, true);
+      }
+    });
+  }
+
+  function getCachedChromasForSkin(skinId) {
+    const numericId = getNumericId(skinId);
+    if (!Number.isFinite(numericId)) {
+      return [];
+    }
+
+    const championId = skinToChampionMap.get(numericId);
+    if (!Number.isFinite(championId)) {
+      return [];
+    }
+
+    const championCache = championSkinCache.get(championId);
+    if (!championCache) {
+      return [];
+    }
+
+    const entry = championCache.get(numericId);
+    if (!entry || !Array.isArray(entry.chromas)) {
+      return [];
+    }
+
+    return entry.chromas.map((chroma) => ({ ...chroma }));
+  }
+
+  function fetchChampionEndpoint(endpoint) {
+    return window
+      .fetch(endpoint, {
+        method: "GET",
+        credentials: "include",
+      })
+      .then((response) => {
+        if (!response || !response.ok) {
+          throw new Error(
+            `HTTP ${response ? response.status : "NO_RESPONSE"} for ${endpoint}`
+          );
+        }
+        return response.json();
+      });
+  }
+
+  function requestChampionDataSequentially(endpoints, index = 0) {
+    if (index >= endpoints.length) {
+      return Promise.resolve(null);
+    }
+    const endpoint = endpoints[index];
+    return fetchChampionEndpoint(endpoint)
+      .then((data) => {
+        if (data && Array.isArray(data.skins)) {
+          return data;
+        }
+        throw new Error("Invalid champion data");
+      })
+      .catch((err) => {
+        log.debug(`Failed to fetch champion data from ${endpoint}`, err);
+        return requestChampionDataSequentially(endpoints, index + 1);
+      });
+  }
+
+  function storeChampionSkins(championId, skins) {
+    const skinMap = new Map();
+    if (!Array.isArray(skins)) {
+      return;
+    }
+
+    skins.forEach((skin) => {
+      const skinId = getNumericId(skin?.id);
+      if (!Number.isFinite(skinId)) {
+        return;
+      }
+
+      const chromas = Array.isArray(skin.chromas) ? skin.chromas : [];
+      const formattedChromas = chromas.map((chroma, index) => {
+        const chromaId =
+          getNumericId(chroma?.id) ?? getNumericId(chroma?.skinId) ?? index;
+        const imagePath =
+          chroma?.chromaPath ||
+          chroma?.chromaPreviewPath ||
+          chroma?.imagePath ||
+          chroma?.splashPath ||
+          "";
+        return {
+          id: chromaId,
+          name: chroma?.name || chroma?.shortName || `Chroma ${index}`,
+          imagePath,
+          locked: !chroma?.ownership?.owned,
+          purchaseDisabled: chroma?.purchaseDisabled,
+        };
+      });
+
+      skinMap.set(skinId, {
+        chromas: formattedChromas,
+        rawSkin: skin,
+      });
+
+      skinToChampionMap.set(skinId, championId);
+      const hasChromas =
+        formattedChromas.length > 0 || isSpecialBaseSkin(skinId);
+      markSkinHasChromas(skinId, hasChromas);
+      if (formattedChromas.length > 0) {
+        registerChromaChildren(skinId, formattedChromas);
+      }
+    });
+
+    championSkinCache.set(championId, skinMap);
+  }
+
+  function fetchChampionSkinData(championId) {
+    if (!Number.isFinite(championId)) {
+      return null;
+    }
+
+    if (championSkinCache.has(championId)) {
+      log.debug(`Champion ${championId} skin data already cached`);
+      return Promise.resolve(championSkinCache.get(championId));
+    }
+
+    if (pendingChampionRequests.has(championId)) {
+      return pendingChampionRequests.get(championId);
+    }
+
+    const endpoints = [
+      `/lol-game-data/assets/v1/champions/${championId}.json`,
+      `/lol-champions/v1/inventories/scouting/champions/${championId}`,
+    ];
+
+    log.debug(`Loading champion ${championId} skin data...`);
+    const requestPromise = requestChampionDataSequentially(endpoints)
+      .then((data) => {
+        if (data && Array.isArray(data.skins)) {
+          storeChampionSkins(championId, data.skins);
+          const cacheEntry = championSkinCache.get(championId);
+          log.debug(
+            `Champion ${championId} skin data cached (${
+              cacheEntry ? cacheEntry.size : 0
+            } skins)`
+          );
+          return championSkinCache.get(championId);
+        }
+        return null;
+      })
+      .catch((err) => {
+        log.debug(
+          `Failed to load champion ${championId} skin data from all endpoints`,
+          err
+        );
+        return null;
+      })
+      .finally(() => {
+        pendingChampionRequests.delete(championId);
+        setTimeout(() => {
+          try {
+            if (typeof scanSkinSelection === "function") {
+              scanSkinSelection();
+            }
+          } catch (e) {
+            log.debug("Rescan after champion fetch failed", e);
+          }
+        }, 0);
+      });
+
+    pendingChampionRequests.set(championId, requestPromise);
+    return requestPromise;
+  }
+
+  function cacheSkinData(element, skinData) {
+    if (!element || !skinData) {
+      return;
+    }
+    try {
+      element.__luChromaSkinData = skinData;
+    } catch (e) {
+      log.debug("Failed to cache skin data", e);
+    }
+  }
+
+  function getCachedSkinData(element) {
+    if (!element) {
+      return null;
+    }
+    if (element.__luChromaSkinData) {
+      return element.__luChromaSkinData;
+    }
+    const skinData = getSkinData(element);
+    if (skinData) {
+      cacheSkinData(element, skinData);
+    }
+    return skinData;
+  }
+
   function injectCSS() {
     const styleId = "lu-chroma-button-css";
     if (document.getElementById(styleId)) {
@@ -465,8 +848,8 @@
     return isSessionInitialized();
   }
 
-  function updateButtonVisibility(button) {
-    const shouldShow = shouldShowChromaButton();
+  function updateButtonVisibility(button, hasChromas) {
+    const shouldShow = shouldShowChromaButton() && Boolean(hasChromas);
     if (shouldShow) {
       button.style.display = "block";
       button.style.pointerEvents = "auto";
@@ -504,19 +887,40 @@
     return false;
   }
 
+  function doesSkinItemMatchSkinState(skinItem) {
+    if (!skinMonitorState?.skinId) {
+      return true;
+    }
+    const skinData = getCachedSkinData(skinItem);
+    const skinId = getSkinIdFromContext(skinData, skinItem);
+    return Number.isFinite(skinId) && skinId === skinMonitorState.skinId;
+  }
+
+  function getSkinItemFromButton(button) {
+    return button.closest(".skin-selection-item, .thumbnail-wrapper");
+  }
+
   function ensureFakeButton(skinItem) {
     if (!skinItem) {
       return;
     }
 
-    const shouldAttachButton = isCurrentSkinItem(skinItem);
+    const isCurrent = isCurrentSkinItem(skinItem);
+    const hasChromas = Boolean(skinMonitorState?.hasChromas);
+
+    if (isCurrent) {
+      emitBridgeLog("current_skin_eval", {
+        stateSkinId: skinMonitorState?.skinId ?? null,
+        hasChromas,
+        elementClasses: skinItem.className,
+      });
+    }
 
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
-    if (!shouldAttachButton) {
+    if (!isCurrent) {
       if (existingButton) {
         existingButton.remove();
-        log.debug("Removed chroma button from non-current skin item");
       }
       return;
     }
@@ -527,12 +931,9 @@
         const fakeButton = createFakeButton();
         skinItem.appendChild(fakeButton);
         existingButton = fakeButton;
-        log.debug("Created fake chroma button for skin item", skinItem);
-      } else {
-        log.debug("Button already exists for current skin item");
       }
 
-      updateButtonVisibility(existingButton);
+      updateButtonVisibility(existingButton, hasChromas);
     } catch (e) {
       log.warn("Failed to create chroma button", e);
     }
@@ -540,22 +941,25 @@
 
   function scanSkinSelection() {
     const skinItems = document.querySelectorAll(".skin-selection-item");
-    log.debug(`Found ${skinItems.length} skin-selection-item elements`);
     skinItems.forEach((skinItem) => {
       ensureFakeButton(skinItem);
     });
 
     const thumbnailWrappers = document.querySelectorAll(".thumbnail-wrapper");
-    log.debug(`Found ${thumbnailWrappers.length} thumbnail-wrapper elements`);
     thumbnailWrappers.forEach((thumbnailWrapper) => {
       ensureFakeButton(thumbnailWrapper);
     });
 
     // Update visibility of all existing buttons
     const existingButtons = document.querySelectorAll(BUTTON_SELECTOR);
-    log.debug(`Total chroma buttons found: ${existingButtons.length}`);
     existingButtons.forEach((button) => {
-      updateButtonVisibility(button);
+      const hostItem = getSkinItemFromButton(button);
+      const matchesSkin =
+        hostItem && doesSkinItemMatchSkinState(hostItem);
+      updateButtonVisibility(
+        button,
+        matchesSkin && Boolean(skinMonitorState?.hasChromas)
+      );
     });
   }
 
@@ -567,6 +971,10 @@
   }
 
   function readCurrentSkinName() {
+    if (skinMonitorState?.name) {
+      return skinMonitorState.name;
+    }
+
     // Read skin name from the same location as skin monitor
     for (const selector of SKIN_SELECTORS) {
       const nodes = document.querySelectorAll(selector);
@@ -702,32 +1110,65 @@
       return [];
     }
 
-    // Try to get chromas from skinData.childSkins if available (from Ember)
-    if (skinData.childSkins && Array.isArray(skinData.childSkins)) {
-      return skinData.childSkins.map((chroma, index) => ({
-        id: chroma.id || chroma.skinId,
-        name: chroma.name || chroma.shortName || `Chroma ${index}`,
-        imagePath: chroma.chromaPreviewPath || chroma.imagePath,
-        selected: chroma.id === skinData.id || index === 0,
-        locked: !chroma.ownership?.owned,
-        purchaseDisabled: chroma.purchaseDisabled,
+    const childSkins = getChildSkinsFromData(skinData);
+    if (childSkins.length > 0) {
+      const baseSkinId = extractSkinIdFromData(skinData);
+      registerChromaChildren(baseSkinId, childSkins);
+      return childSkins.map((chroma, index) => {
+        const chromaId =
+          extractSkinIdFromData(chroma) ?? chroma.id ?? chroma.skinId ?? index;
+        return {
+          id: chromaId,
+          name: chroma.name || chroma.shortName || `Chroma ${index}`,
+          imagePath: chroma.chromaPreviewPath || chroma.imagePath,
+          selected:
+            chroma.id === skinData.id ||
+            chroma.skinId === skinData.id ||
+            index === 0,
+          locked: !chroma.ownership?.owned,
+          purchaseDisabled: chroma.purchaseDisabled,
+        };
+      });
+    }
+
+    const baseSkinId = extractSkinIdFromData(skinData);
+    const cachedChromas = getCachedChromasForSkin(baseSkinId);
+    if (cachedChromas.length > 0) {
+      return cachedChromas.map((chroma, index) => ({
+        ...chroma,
+        selected: chroma.selected ?? index === 0,
       }));
     }
 
     // Fallback: construct chroma paths based on skin ID
-    const baseSkinId = skinData.skinId || skinData.id;
-    if (!baseSkinId) {
+    const fallbackSkinId = baseSkinId ?? skinData.id;
+    const effectiveSkinId = getNumericId(fallbackSkinId);
+    const championId =
+      skinData.championId || getChampionIdFromContext(skinData, effectiveSkinId);
+    const resolvedChampionId =
+      championId || (Number.isFinite(effectiveSkinId)
+        ? Math.floor(effectiveSkinId / 1000)
+        : null);
+
+    if (!Number.isFinite(effectiveSkinId)) {
       return [];
     }
 
-    const championId = skinData.championId || Math.floor(baseSkinId / 1000);
+    const fallbackChampionId = resolvedChampionId;
+    const championForImages =
+      fallbackChampionId ?? (Number.isFinite(effectiveSkinId)
+        ? Math.floor(effectiveSkinId / 1000)
+        : null);
+    if (!championForImages) {
+      return [];
+    }
     const chromas = [];
 
     // Create base skin as first option
     chromas.push({
-      id: baseSkinId,
+      id: effectiveSkinId,
       name: "Default",
-      imagePath: `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}000.png`,
+      imagePath: `/lol-game-data/assets/v1/champion-chroma-images/${championForImages}/${effectiveSkinId}000.png`,
       selected: true,
       locked: false,
     });
@@ -735,11 +1176,11 @@
     // Try to find additional chromas (typically numbered 001-012)
     // We'll create a few placeholder chromas
     for (let i = 1; i <= 3; i++) {
-      const chromaId = baseSkinId * 1000 + i;
+      const chromaId = effectiveSkinId * 1000 + i;
       chromas.push({
         id: chromaId,
         name: `Chroma ${i}`,
-        imagePath: `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${chromaId}.png`,
+        imagePath: `/lol-game-data/assets/v1/champion-chroma-images/${championForImages}/${chromaId}.png`,
         selected: false,
         locked: true, // Assume locked unless we can verify ownership
       });
@@ -1050,7 +1491,7 @@
     }
 
     log.debug("Extracting skin data...");
-    const skinData = getSkinData(skinItem);
+    const skinData = getCachedSkinData(skinItem);
     log.debug("Skin data extracted:", skinData);
 
     if (!skinData) {
@@ -1130,12 +1571,40 @@
     };
   }
 
+  function subscribeToSkinMonitor() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.__leagueUnlockedSkinState) {
+      skinMonitorState = window.__leagueUnlockedSkinState;
+    }
+
+    try {
+      scanSkinSelection();
+    } catch (e) {
+      log.debug("Initial scan after skin state preload failed", e);
+    }
+
+    window.addEventListener("lu-skin-monitor-state", (event) => {
+      const detail = event?.detail;
+      emitBridgeLog("skin_state_update", detail || {});
+      skinMonitorState = detail || null;
+      try {
+        scanSkinSelection();
+      } catch (e) {
+        log.debug("scanSkinSelection failed after state update", e);
+      }
+    });
+  }
+
   function init() {
     if (!document || !document.head) {
       requestAnimationFrame(init);
       return;
     }
 
+    subscribeToSkinMonitor();
     injectCSS();
     scanSkinSelection();
     setupObserver();
