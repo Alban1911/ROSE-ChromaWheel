@@ -302,9 +302,17 @@
       cursor: pointer;
     }
 
+    .${PANEL_CLASS} .chroma-skin-button.selected {
+      /* Selected state: 2px golden border around the button */
+      border: 2px solid #c89b3c;
+      box-sizing: border-box;
+      /* Border is inside the 26px, so inner space is 22px */
+    }
+    
     .${PANEL_CLASS} .chroma-skin-button.selected .contents {
-      /* Selected state: add thin gold border */
-      border: 1px solid #c89b3c;
+      /* Create 2px gap on each side: 22px inner - 4px gap = 18px contents */
+      height: 18px;
+      width: 18px;
     }
 
     .${PANEL_CLASS} .chroma-skin-button.locked {
@@ -1617,12 +1625,9 @@
         if (primaryColor) {
           // Ensure color has # prefix
           const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
-          // Use gradient background matching official League style
-          // Official League uses: linear-gradient(135deg, #COLOR 0%, #COLOR 50%, #COLOR 50%, #COLOR 100%)
-          contents.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
-          contents.style.backgroundSize = "cover";
-          contents.style.backgroundPosition = "center";
-          contents.style.backgroundRepeat = "no-repeat";
+          // Use solid background color (no gradient to avoid darkening)
+          contents.style.backgroundColor = color;
+          contents.style.background = color;
           log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
         } else if (chroma.imagePath) {
           // Fall back to image if no color available
