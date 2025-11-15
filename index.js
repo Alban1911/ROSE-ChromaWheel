@@ -305,6 +305,8 @@
       width: 26px;
       cursor: pointer;
       box-sizing: border-box; /* Consistent box model */
+      background: transparent !important;
+      background-color: transparent !important;
     }
 
     .${PANEL_CLASS}[data-no-button] .chroma-skin-button {
@@ -323,6 +325,8 @@
       border: 2px solid #c89b3c;
       box-sizing: border-box;
       /* Border is inside the 26px, so inner space is 22px */
+      background: transparent !important;
+      background-color: transparent !important;
     }
     
     .${PANEL_CLASS} .chroma-skin-button.selected .contents,
