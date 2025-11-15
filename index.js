@@ -25,6 +25,7 @@
   // Track selected chroma for button color update (controlled by Python)
   let selectedChromaData = null; // { id, primaryColor, colors, name }
   let pythonChromaState = null; // { selectedChromaId, chromaColor, chromaColors, currentSkinId }
+  let championLocked = false; // Track if a champion is locked
   
   // WebSocket bridge for sending chroma selection to Python
   const BRIDGE_URL = "ws://localhost:3000";
@@ -436,6 +437,9 @@
                 } else if (data && data.type === "local-asset-url") {
                   // Handle local asset URL from Python
                   handleLocalAssetUrl(data);
+                } else if (data && data.type === "champion-locked") {
+                  // Handle champion lock state update
+                  handleChampionLocked(data);
                 }
               } catch (error) {
                 // Not JSON or invalid - ignore
@@ -1561,8 +1565,40 @@
     return button.closest(".skin-selection-item, .thumbnail-wrapper");
   }
 
+  function handleChampionLocked(data) {
+    const wasLocked = championLocked;
+    championLocked = data.locked === true;
+    
+    log.debug(`[ChromaWheel] Champion lock state updated: ${championLocked} (was: ${wasLocked})`);
+    
+    // If champion was unlocked, remove all buttons
+    if (!championLocked && wasLocked) {
+      log.debug("[ChromaWheel] Champion unlocked - removing all chroma buttons");
+      const allButtons = document.querySelectorAll(BUTTON_SELECTOR);
+      allButtons.forEach(button => button.remove());
+    } else if (championLocked && !wasLocked) {
+      // Champion just locked - scan for buttons
+      log.debug("[ChromaWheel] Champion locked - scanning for chroma buttons");
+      setTimeout(() => {
+        if (typeof scanSkinSelection === "function") {
+          scanSkinSelection();
+        }
+      }, 100);
+    }
+  }
+
   function ensureFakeButton(skinItem) {
     if (!skinItem) {
+      return;
+    }
+
+    // Don't create button if champion is not locked
+    if (!championLocked) {
+      // Remove existing button if champion is not locked
+      const existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+      if (existingButton) {
+        existingButton.remove();
+      }
       return;
     }
 
