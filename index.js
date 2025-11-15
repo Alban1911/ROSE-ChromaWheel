@@ -557,6 +557,11 @@
       return id === 99007 || (id >= 99991 && id <= 99999);
     };
     
+    // Check if this is a HOL chroma (Kai'Sa or Ahri)
+    const isHolChroma = (id) => {
+      return id === 145070 || id === 145071 || id === 103085 || id === 103086;
+    };
+    
     // Helper to get buttonIconPath for Elementalist Lux forms
     const getButtonIconPathForElementalist = (chromaId) => {
       if (isElementalistLux(chromaId)) {
@@ -565,10 +570,35 @@
       return null;
     };
     
+    // Helper to get buttonIconPath for HOL chromas
+    const getButtonIconPathForHol = (chromaId) => {
+      if (isHolChroma(chromaId)) {
+        // Determine base skin ID and champion ID
+        let baseSkinId;
+        let championId;
+        
+        if (chromaId === 145070 || chromaId === 145071) {
+          // Kai'Sa HOL
+          baseSkinId = 145070;
+          championId = 145;
+        } else if (chromaId === 103085 || chromaId === 103086) {
+          // Ahri HOL
+          baseSkinId = 103085;
+          championId = 103;
+        } else {
+          return null;
+        }
+        
+        return getHolButtonIconPath(championId, chromaId, baseSkinId);
+      }
+      return null;
+    };
+    
     // Update selectedChromaData based on Python state
     if (data.selectedChromaId && data.chromaColor) {
       // Python provided the color directly
       const buttonIconPath = getButtonIconPathForElementalist(data.selectedChromaId) || 
+                            getButtonIconPathForHol(data.selectedChromaId) ||
                             (selectedChromaData && selectedChromaData.id === data.selectedChromaId ? selectedChromaData.buttonIconPath : null);
       selectedChromaData = {
         id: data.selectedChromaId,
@@ -637,6 +667,55 @@
           }
         }
         log.debug(`[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`);
+      } else if (isHolChroma(data.selectedChromaId)) {
+        // HOL chroma - get data from local functions
+        let baseSkinId;
+        let championId;
+        
+        if (data.selectedChromaId === 145070 || data.selectedChromaId === 145071) {
+          // Kai'Sa HOL
+          baseSkinId = 145070;
+          championId = 145;
+        } else if (data.selectedChromaId === 103085 || data.selectedChromaId === 103086) {
+          // Ahri HOL
+          baseSkinId = 103085;
+          championId = 103;
+        }
+        
+        // Check if it's the base skin or HOL chroma
+        if (data.selectedChromaId === baseSkinId) {
+          // Base skin
+          selectedChromaData = {
+            id: data.selectedChromaId,
+            primaryColor: null,
+            colors: [],
+            name: "Default",
+            buttonIconPath: getHolButtonIconPath(championId, baseSkinId, baseSkinId),
+          };
+        } else {
+          // HOL chroma
+          const holChromas = championId === 145 ? getKaisaHolChromas() : getAhriHolChromas();
+          const holChroma = holChromas.find(c => c.id === data.selectedChromaId);
+          if (holChroma) {
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: holChroma.name || "Selected",
+              buttonIconPath: getHolButtonIconPath(championId, data.selectedChromaId, baseSkinId),
+            };
+          } else {
+            // HOL chroma not found - use button icon path anyway
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: "Selected",
+              buttonIconPath: getHolButtonIconPath(championId, data.selectedChromaId, baseSkinId),
+            };
+          }
+        }
+        log.debug(`[ChromaWheel] HOL chroma detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`);
       } else {
         // Regular chroma - try to find from cache
         // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
@@ -693,10 +772,28 @@
       }
     } else {
       // Default/base chroma selected
-      // Check if currentSkinId is Elementalist Lux base
-      const buttonIconPath = isElementalistLux(data.currentSkinId) 
-        ? getElementalistButtonIconPath(data.currentSkinId)
-        : null;
+      // Check if currentSkinId is Elementalist Lux base or HOL base
+      let buttonIconPath = null;
+      if (isElementalistLux(data.currentSkinId)) {
+        buttonIconPath = getElementalistButtonIconPath(data.currentSkinId);
+      } else if (isHolChroma(data.currentSkinId)) {
+        // Determine base skin ID and champion ID for HOL
+        let baseSkinId;
+        let championId;
+        
+        if (data.currentSkinId === 145070 || data.currentSkinId === 145071) {
+          baseSkinId = 145070;
+          championId = 145;
+        } else if (data.currentSkinId === 103085 || data.currentSkinId === 103086) {
+          baseSkinId = 103085;
+          championId = 103;
+        }
+        
+        if (baseSkinId && championId) {
+          buttonIconPath = getHolButtonIconPath(championId, data.currentSkinId, baseSkinId);
+        }
+      }
+      
       selectedChromaData = {
         id: data.currentSkinId || null,
         primaryColor: null,
@@ -880,6 +977,28 @@
     // Python will return the local file path or serve it via HTTP
     // For now, construct the expected path structure
     const path = `local-asset://elementalist_buttons/${formId}.png`;
+    return path;
+  }
+
+  // Get button icon path for HOL chromas (Kai'Sa and Ahri)
+  function getHolButtonIconPath(championId, chromaId, baseSkinId) {
+    // Determine which button icon to use based on chroma ID
+    // Base skins (145070, 103085) use "risen.png"
+    // HOL chromas (145071, 103086) use "immortal.png"
+    let imageName;
+    let folderName;
+    
+    if (chromaId === baseSkinId) {
+      // Base skin - use "risen.png"
+      imageName = "risen.png";
+      folderName = championId === 145 ? "kaisa_buttons" : "ahri_buttons";
+    } else {
+      // HOL chroma - use "immortal.png"
+      imageName = "immortal.png";
+      folderName = championId === 145 ? "kaisa_buttons" : "ahri_buttons";
+    }
+    
+    const path = `local-asset://${folderName}/${imageName}`;
     return path;
   }
 
@@ -1776,6 +1895,7 @@
         primaryColor: null,
         selected: false,
         locked: false,
+        buttonIconPath: getHolButtonIconPath(kaisaChampionId, actualBaseSkinId, actualBaseSkinId),
       };
       
       // HOL chroma (Immortalized Legend)
@@ -1787,6 +1907,7 @@
         primaryColor: null,
         selected: false,
         locked: false, // HOL chromas are clickable
+        buttonIconPath: getHolButtonIconPath(kaisaChampionId, chroma.id, actualBaseSkinId),
       }));
       
       const allChromas = [baseSkinChroma, ...holChromaList];
@@ -1809,6 +1930,7 @@
         primaryColor: null,
         selected: false,
         locked: false,
+        buttonIconPath: getHolButtonIconPath(ahriChampionId, actualBaseSkinId, actualBaseSkinId),
       };
       
       // HOL chroma (Immortalized Legend)
@@ -1820,6 +1942,7 @@
         primaryColor: null,
         selected: false,
         locked: false, // HOL chromas are clickable
+        buttonIconPath: getHolButtonIconPath(ahriChampionId, chroma.id, actualBaseSkinId),
       }));
       
       const allChromas = [baseSkinChroma, ...holChromaList];
@@ -2125,7 +2248,7 @@
         primaryColor: selectedChroma.primaryColor || selectedChroma.colors?.[1] || selectedChroma.colors?.[0] || null,
         colors: selectedChroma.colors || [],
         name: selectedChroma.name,
-        buttonIconPath: selectedChroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms
+        buttonIconPath: selectedChroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms and HOL chromas
       };
       
       // Note: selectedChromaData will be updated by Python's chroma-state message
@@ -2503,10 +2626,10 @@
         return;
       }
 
-      // Check if this chroma has a button icon path (Elementalist Lux forms)
+      // Check if this chroma has a button icon path (Elementalist Lux forms or HOL chromas)
       if (selectedChromaData && selectedChromaData.buttonIconPath && selectedChromaData.buttonIconPath.startsWith("local-asset://")) {
-        // Elementalist Lux form - always request the icon to ensure it matches the selected chroma
-        // Track the last applied chroma ID on the button to detect when switching forms
+        // Elementalist Lux form or HOL chroma - always request the icon to ensure it matches the selected chroma
+        // Track the last applied chroma ID on the button to detect when switching between chromas
         const lastAppliedChromaId = content.getAttribute("data-last-chroma-id");
         const chromaIdChanged = lastAppliedChromaId !== String(selectedChromaData.id);
         
@@ -2514,9 +2637,9 @@
         const hasPendingRequestForThisChroma = pendingLocalAssets.has(selectedChromaData.id);
         
         // Always request if:
-        // 1. Chroma ID changed (switching between forms)
+        // 1. Chroma ID changed (switching between forms/chromas)
         // 2. No pending request for this chroma ID (new request needed)
-        // This ensures the icon updates immediately when switching between forms
+        // This ensures the icon updates immediately when switching between chromas
         if (chromaIdChanged || !hasPendingRequestForThisChroma) {
           const iconPath = selectedChromaData.buttonIconPath.replace("local-asset://", "");
           
@@ -2537,7 +2660,7 @@
           log.debug(`[ChromaWheel] Requested button icon for chroma selection button: ${iconPath} for chroma ${selectedChromaData.id} (chromaIdChanged: ${chromaIdChanged})`);
           
           // Only show placeholder if there's no existing icon
-          // If we're switching between forms, keep the old icon visible until the new one loads (prevents flicker)
+          // If we're switching between chromas, keep the old icon visible until the new one loads (prevents flicker)
           const existingBgImage = content.style.backgroundImage;
           const hasExistingIcon = existingBgImage && existingBgImage !== "none" && existingBgImage !== "";
           
@@ -2562,14 +2685,20 @@
       }
 
       // Check if this is the default chroma (no color or name is "Default")
-      // BUT: For Elementalist Lux, even the "Default" button should show its icon, not the generic default
+      // BUT: For Elementalist Lux and HOL chromas, even the "Default" button should show its icon, not the generic default
       const isElementalistLux = selectedChromaData && (
         selectedChromaData.id === 99007 || 
         (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999)
       );
+      const isHolChroma = selectedChromaData && (
+        selectedChromaData.id === 145070 || 
+        selectedChromaData.id === 145071 || 
+        selectedChromaData.id === 103085 || 
+        selectedChromaData.id === 103086
+      );
       const isDefault = !selectedChromaData || 
-                       (selectedChromaData.name === "Default" && !isElementalistLux) || 
-                       (!selectedChromaData.primaryColor && !isElementalistLux) ||
+                       (selectedChromaData.name === "Default" && !isElementalistLux && !isHolChroma) || 
+                       (!selectedChromaData.primaryColor && !isElementalistLux && !isHolChroma) ||
                        selectedChromaData.id === 0;
 
       if (isDefault) {
@@ -2625,7 +2754,7 @@
       primaryColor: chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0] || null,
       colors: chroma.colors || [],
       name: chroma.name,
-      buttonIconPath: chroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms
+      buttonIconPath: chroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms and HOL chromas
     };
     
     // Update button color immediately
