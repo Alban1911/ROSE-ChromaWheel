@@ -1258,12 +1258,18 @@
     if (Array.isArray(skinData.chromas) && skinData.chromas.length > 0) {
       log.debug(`[getChromaData] Found ${skinData.chromas.length} chromas directly in skinData (official client method)`);
       const baseSkinId = extractSkinIdFromData(skinData);
+      const championId = getChampionIdFromContext(skinData, baseSkinId, null);
       
       // Include the base skin as the first option (default)
+      // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
+      const defaultImagePath = championId && baseSkinId
+        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+        : null;
+      
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
-        imagePath: null,
+        imagePath: defaultImagePath,
         colors: [],
         primaryColor: null,
         selected: true,
@@ -1295,13 +1301,19 @@
     if (childSkins.length > 0) {
       log.debug(`[getChromaData] Found ${childSkins.length} child skins in skinData`);
       const baseSkinId = extractSkinIdFromData(skinData);
+      const championId = getChampionIdFromContext(skinData, baseSkinId, null);
       registerChromaChildren(baseSkinId, childSkins);
       
       // Include the base skin as the first option (default)
+      // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
+      const defaultImagePath = championId && baseSkinId
+        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+        : null;
+      
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
-        imagePath: null,
+        imagePath: defaultImagePath,
         colors: [],
         primaryColor: null,
         selected: true,
@@ -1338,11 +1350,18 @@
     const cachedChromas = getCachedChromasForSkin(baseSkinId);
     if (cachedChromas.length > 0) {
       log.debug(`[getChromaData] Found ${cachedChromas.length} cached chromas for skin ${baseSkinId}`);
+      const championId = getChampionIdFromContext(skinData, baseSkinId, null);
+      
       // Include the base skin as the first option (default)
+      // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
+      const defaultImagePath = championId && baseSkinId
+        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+        : null;
+      
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
-        imagePath: null,
+        imagePath: defaultImagePath,
         colors: [],
         primaryColor: null,
         selected: true,
@@ -1579,6 +1598,15 @@
     chromaList.style.gap = "0";
     chromaList.style.width = "100%";
 
+    // Track hover state to ensure preview resets to selected when no button is hovered
+    let hoveredChromaId = null;
+    const resetToSelectedPreview = () => {
+      const selectedChroma = chromas.find(c => c.selected);
+      if (selectedChroma && hoveredChromaId === null) {
+        updateChromaPreview(selectedChroma, chromaImage);
+      }
+    };
+
     // Create chroma buttons as li elements (matching official League structure)
     let buttonCount = 0;
     chromas.forEach((chroma, index) => {
@@ -1657,21 +1685,36 @@
       // Add hover handlers to update preview (matching official client behavior)
       chromaButton.addEventListener("mouseenter", (e) => {
         e.stopPropagation();
+        hoveredChromaId = chroma.id;
         updateChromaPreview(chroma, chromaImage);
       });
 
       chromaButton.addEventListener("mouseleave", (e) => {
         e.stopPropagation();
-        // Reset to currently selected chroma when not hovering
-        const selectedChroma = chromas.find(c => c.selected);
-        if (selectedChroma) {
-          updateChromaPreview(selectedChroma, chromaImage);
-        }
+        // Clear hover state and reset to selected chroma
+        hoveredChromaId = null;
+        // Use setTimeout to check if we're entering another button
+        setTimeout(() => {
+          if (hoveredChromaId === null) {
+            resetToSelectedPreview();
+          }
+        }, 0);
       });
     });
 
     log.info(`[ChromaWheel] Created ${buttonCount} chroma buttons in panel`);
     scrollable.appendChild(chromaList);
+
+    // Reset to selected chroma when mouse leaves the scrollable area
+    scrollable.addEventListener("mouseleave", (e) => {
+      // Only reset if we're not entering another button
+      hoveredChromaId = null;
+      setTimeout(() => {
+        if (hoveredChromaId === null) {
+          resetToSelectedPreview();
+        }
+      }, 0);
+    });
 
     modal.appendChild(border);
     modal.appendChild(chromaInfo);
