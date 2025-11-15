@@ -420,17 +420,23 @@
       log.debug(`${LOG_PREFIX} Bridge socket connected`);
     });
 
-    bridgeSocket.addEventListener("message", (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data && data.type === "chroma-state") {
-          // Handle chroma state update from Python
-          handleChromaStateUpdate(data);
-        }
-      } catch (error) {
-        // Not JSON or invalid - ignore
-      }
-    });
+            bridgeSocket.addEventListener("message", (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                if (data && data.type === "chroma-state") {
+                  // Handle chroma state update from Python
+                  handleChromaStateUpdate(data);
+                } else if (data && data.type === "local-preview-url") {
+                  // Handle local preview URL from Python
+                  handleLocalPreviewUrl(data);
+                } else if (data && data.type === "local-asset-url") {
+                  // Handle local asset URL from Python
+                  handleLocalAssetUrl(data);
+                }
+              } catch (error) {
+                // Not JSON or invalid - ignore
+              }
+            });
 
     bridgeSocket.addEventListener("close", () => {
       bridgeReady = false;
@@ -481,6 +487,60 @@
     }
   }
 
+  // Track pending local preview/asset requests
+  const pendingLocalPreviews = new Map(); // chromaId -> { chromaImage, chroma }
+  const pendingLocalAssets = new Map(); // chromaId -> { contents, chroma }
+
+  function handleLocalPreviewUrl(data) {
+    // Handle local preview URL response from Python
+    const { championId, skinId, chromaId, url } = data;
+    log.debug(`[ChromaWheel] Received local preview URL: ${url} for chroma ${chromaId}`);
+    
+    // Find the chroma image element that requested this preview
+    const pending = pendingLocalPreviews.get(chromaId);
+    if (pending && pending.chromaImage) {
+      // Use the file:// URL (may not work due to browser security, but worth trying)
+      // If it doesn't work, Python should serve via HTTP instead
+      pending.chromaImage.style.background = "";
+      pending.chromaImage.style.backgroundImage = `url('${url}')`;
+      pending.chromaImage.style.backgroundSize = "contain";
+      pending.chromaImage.style.backgroundPosition = "center";
+      pending.chromaImage.style.backgroundRepeat = "no-repeat";
+      pending.chromaImage.style.display = "";
+      log.debug(`[ChromaWheel] Applied local preview URL to chroma image`);
+    }
+    
+    // Clean up pending request
+    pendingLocalPreviews.delete(chromaId);
+  }
+
+  function handleLocalAssetUrl(data) {
+    // Handle local asset URL response from Python
+    const { assetPath, chromaId, url } = data;
+    log.debug(`[ChromaWheel] Received local asset URL: ${url} for chroma ${chromaId}`);
+    
+    // Find the button contents element that requested this asset
+    const pending = pendingLocalAssets.get(chromaId);
+    if (pending && pending.contents) {
+      // Use the file:// URL (may not work due to browser security, but worth trying)
+      // If it doesn't work, Python should serve via HTTP instead
+      pending.contents.style.background = "";
+      pending.contents.style.backgroundImage = `url('${url}')`;
+      pending.contents.style.backgroundSize = "contain";
+      pending.contents.style.backgroundPosition = "center";
+      pending.contents.style.backgroundRepeat = "no-repeat";
+      pending.contents.style.backgroundColor = "";
+      
+      // Mark that this chroma ID's icon has been applied
+      pending.contents.setAttribute("data-last-chroma-id", String(chromaId));
+      
+      log.debug(`[ChromaWheel] Applied local asset URL to button icon for chroma ${chromaId}`);
+    }
+    
+    // Clean up pending request
+    pendingLocalAssets.delete(chromaId);
+  }
+
   function handleChromaStateUpdate(data) {
     // Update Python chroma state
     pythonChromaState = {
@@ -492,14 +552,30 @@
     
     log.info(`[ChromaWheel] Received chroma state from Python: selectedChromaId=${data.selectedChromaId}, chromaColor=${data.chromaColor}`);
     
+    // Check if this is an Elementalist Lux form (ID 99991-99999 or base 99007)
+    const isElementalistLux = (id) => {
+      return id === 99007 || (id >= 99991 && id <= 99999);
+    };
+    
+    // Helper to get buttonIconPath for Elementalist Lux forms
+    const getButtonIconPathForElementalist = (chromaId) => {
+      if (isElementalistLux(chromaId)) {
+        return getElementalistButtonIconPath(chromaId);
+      }
+      return null;
+    };
+    
     // Update selectedChromaData based on Python state
     if (data.selectedChromaId && data.chromaColor) {
       // Python provided the color directly
+      const buttonIconPath = getButtonIconPathForElementalist(data.selectedChromaId) || 
+                            (selectedChromaData && selectedChromaData.id === data.selectedChromaId ? selectedChromaData.buttonIconPath : null);
       selectedChromaData = {
         id: data.selectedChromaId,
         primaryColor: data.chromaColor,
         colors: data.chromaColors || [data.chromaColor],
         name: "Selected", // Name will be updated when panel opens
+        buttonIconPath: buttonIconPath,
       };
     } else if (data.selectedChromaId) {
       // Python provided selectedChromaId but no color - try to find it from cache
@@ -521,55 +597,112 @@
         log.debug(`[ChromaWheel] Found base skin ID ${baseSkinId} for selected chroma ${data.selectedChromaId} from chromaParentMap`);
       }
       
-      // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
-      if (!baseSkinId && Number.isFinite(data.selectedChromaId)) {
-        // Try to find base skin by checking if any cached skin has this chroma
-        // Or use the base skin ID from skinMonitorState if available
-        baseSkinId = skinMonitorState?.skinId;
-        // If skinMonitorState.skinId is also a chroma, try to get base from it
-        if (baseSkinId && chromaParentMap.has(baseSkinId)) {
-          baseSkinId = chromaParentMap.get(baseSkinId);
-        }
-      }
-      
-      if (baseSkinId) {
-        const cachedChromas = getCachedChromasForSkin(baseSkinId);
-        foundChroma = cachedChromas.find(c => c.id === data.selectedChromaId);
-        log.debug(`[ChromaWheel] Looking for chroma ${data.selectedChromaId} in base skin ${baseSkinId}, found: ${foundChroma ? 'yes' : 'no'}`);
-      }
-      
-      if (foundChroma && foundChroma.primaryColor) {
-        selectedChromaData = {
-          id: data.selectedChromaId,
-          primaryColor: foundChroma.primaryColor,
-          colors: foundChroma.colors || [foundChroma.primaryColor],
-          name: foundChroma.name || "Selected",
-        };
-        log.debug(`[ChromaWheel] Found chroma color from cache: ${foundChroma.primaryColor}`);
-      } else {
-        // Chroma selected but no color available - try to keep existing selectedChromaData if it matches
-        if (selectedChromaData && selectedChromaData.id === data.selectedChromaId && selectedChromaData.primaryColor) {
-          log.debug(`[ChromaWheel] Keeping existing selectedChromaData for chroma ${data.selectedChromaId}`);
-          // Keep the existing data, just update the ID to be sure
-          selectedChromaData.id = data.selectedChromaId;
-        } else {
-          // No existing data or it doesn't match - treat as default
+      // Check if this is Elementalist Lux - if so, use local data
+      if (isElementalistLux(data.selectedChromaId)) {
+        // Elementalist Lux form - get data from local functions
+        const baseFormId = 99007;
+        const luxChampionId = 99;
+        
+        // Check if it's the base form or a form
+        if (data.selectedChromaId === baseFormId) {
+          // Base form
           selectedChromaData = {
             id: data.selectedChromaId,
             primaryColor: null,
             colors: [],
             name: "Default",
+            buttonIconPath: getElementalistButtonIconPath(baseFormId),
           };
-          log.debug(`[ChromaWheel] Could not find chroma color for ${data.selectedChromaId}, using default`);
+        } else {
+          // Elementalist Lux form (99991-99999)
+          const forms = getElementalistForms();
+          const form = forms.find(f => f.id === data.selectedChromaId);
+          if (form) {
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: form.name || "Selected",
+              buttonIconPath: getElementalistButtonIconPath(form.id),
+            };
+          } else {
+            // Form not found - use button icon path anyway
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: "Selected",
+              buttonIconPath: getElementalistButtonIconPath(data.selectedChromaId),
+            };
+          }
+        }
+        log.debug(`[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`);
+      } else {
+        // Regular chroma - try to find from cache
+        // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
+        if (!baseSkinId && Number.isFinite(data.selectedChromaId)) {
+          // Try to find base skin by checking if any cached skin has this chroma
+          // Or use the base skin ID from skinMonitorState if available
+          baseSkinId = skinMonitorState?.skinId;
+          // If skinMonitorState.skinId is also a chroma, try to get base from it
+          if (baseSkinId && chromaParentMap.has(baseSkinId)) {
+            baseSkinId = chromaParentMap.get(baseSkinId);
+          }
+        }
+        
+        if (baseSkinId) {
+          const cachedChromas = getCachedChromasForSkin(baseSkinId);
+          foundChroma = cachedChromas.find(c => c.id === data.selectedChromaId);
+          log.debug(`[ChromaWheel] Looking for chroma ${data.selectedChromaId} in base skin ${baseSkinId}, found: ${foundChroma ? 'yes' : 'no'}`);
+        }
+        
+        if (foundChroma && foundChroma.primaryColor) {
+          // Preserve buttonIconPath if it exists in foundChroma or in existing selectedChromaData
+          const buttonIconPath = foundChroma.buttonIconPath || 
+                               (selectedChromaData && selectedChromaData.id === data.selectedChromaId ? selectedChromaData.buttonIconPath : null);
+          selectedChromaData = {
+            id: data.selectedChromaId,
+            primaryColor: foundChroma.primaryColor,
+            colors: foundChroma.colors || [foundChroma.primaryColor],
+            name: foundChroma.name || "Selected",
+            buttonIconPath: buttonIconPath,
+          };
+          log.debug(`[ChromaWheel] Found chroma color from cache: ${foundChroma.primaryColor}`);
+        } else {
+          // Chroma selected but no color available - try to keep existing selectedChromaData if it matches
+          if (selectedChromaData && selectedChromaData.id === data.selectedChromaId) {
+            log.debug(`[ChromaWheel] Keeping existing selectedChromaData for chroma ${data.selectedChromaId}`);
+            // Keep the existing data, just update the ID to be sure
+            selectedChromaData.id = data.selectedChromaId;
+            // Preserve buttonIconPath if it exists
+            if (!selectedChromaData.buttonIconPath) {
+              selectedChromaData.buttonIconPath = null;
+            }
+          } else {
+            // No existing data or it doesn't match - treat as default
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: "Default",
+              buttonIconPath: null,
+            };
+            log.debug(`[ChromaWheel] Could not find chroma color for ${data.selectedChromaId}, using default`);
+          }
         }
       }
     } else {
       // Default/base chroma selected
+      // Check if currentSkinId is Elementalist Lux base
+      const buttonIconPath = isElementalistLux(data.currentSkinId) 
+        ? getElementalistButtonIconPath(data.currentSkinId)
+        : null;
       selectedChromaData = {
         id: data.currentSkinId || null,
         primaryColor: null,
         colors: [],
         name: "Default",
+        buttonIconPath: buttonIconPath,
       };
     }
     
@@ -686,6 +819,68 @@
 
   function isElementalistFormSkinId(skinId) {
     return Number.isFinite(skinId) && skinId >= 99991 && skinId <= 99999;
+  }
+
+  // Get Elementalist Lux Forms data locally (same as Python's _get_elementalist_forms)
+  function getElementalistForms() {
+    const forms = [
+      { id: 99991, name: 'Air', colors: [], form_path: 'Lux/Forms/Lux Elementalist Air.zip' },
+      { id: 99992, name: 'Dark', colors: [], form_path: 'Lux/Forms/Lux Elementalist Dark.zip' },
+      { id: 99993, name: 'Ice', colors: [], form_path: 'Lux/Forms/Lux Elementalist Ice.zip' },
+      { id: 99994, name: 'Magma', colors: [], form_path: 'Lux/Forms/Lux Elementalist Magma.zip' },
+      { id: 99995, name: 'Mystic', colors: [], form_path: 'Lux/Forms/Lux Elementalist Mystic.zip' },
+      { id: 99996, name: 'Nature', colors: [], form_path: 'Lux/Forms/Lux Elementalist Nature.zip' },
+      { id: 99997, name: 'Storm', colors: [], form_path: 'Lux/Forms/Lux Elementalist Storm.zip' },
+      { id: 99998, name: 'Water', colors: [], form_path: 'Lux/Forms/Lux Elementalist Water.zip' },
+      { id: 99999, name: 'Fire', colors: [], form_path: 'Lux/Forms/Elementalist Lux Fire.zip' },
+    ];
+    log.debug(`[getElementalistForms] Created ${forms.length} Elementalist Lux Forms with fake IDs (99991-99999)`);
+    return forms;
+  }
+
+  // Get Risen Legend Kai'Sa HOL chroma data locally (same as Python's _get_hol_chromas)
+  function getKaisaHolChromas() {
+    const chromas = [
+      { id: 145071, skinId: 145070, name: 'Immortalized Legend', colors: [] },
+    ];
+    log.debug(`[getKaisaHolChromas] Created ${chromas.length} Risen Legend Kai'Sa HOL chromas with real skin ID (145071)`);
+    return chromas;
+  }
+
+  // Get Risen Legend Ahri HOL chroma data locally (same as Python's _get_ahri_hol_chromas)
+  function getAhriHolChromas() {
+    const chromas = [
+      { id: 103086, skinId: 103085, name: 'Immortalized Legend', colors: [] },
+    ];
+    log.debug(`[getAhriHolChromas] Created ${chromas.length} Risen Legend Ahri HOL chromas with real skin ID (103086)`);
+    return chromas;
+  }
+
+  // Get local preview image path for special skins (like Python's ChromaPreviewManager)
+  // Path structure: {champion_id}/{skin_id}/{chroma_id}/{chroma_id}.png
+  // For base skin: {champion_id}/{skin_id}/{skin_id}.png
+  function getLocalPreviewPath(championId, skinId, chromaId, isBase = false) {
+    if (!Number.isFinite(championId) || !Number.isFinite(skinId)) {
+      return null;
+    }
+    
+    // Request preview path from Python via bridge
+    // Python will return the local file path or serve it via HTTP
+    // For now, construct the expected path structure
+    // Note: JavaScript can't access local files directly, so we'll need Python to serve these
+    const previewId = isBase ? skinId : chromaId;
+    const path = `local-preview://${championId}/${skinId}/${previewId}/${previewId}.png`;
+    return path;
+  }
+
+  // Get local button icon path for Elementalist Lux forms
+  // Path: assets/elementalist_buttons/{form_id}.png
+  function getElementalistButtonIconPath(formId) {
+    // Request icon path from Python via bridge
+    // Python will return the local file path or serve it via HTTP
+    // For now, construct the expected path structure
+    const path = `local-asset://elementalist_buttons/${formId}.png`;
+    return path;
   }
 
   function isSpecialBaseSkin(skinId) {
@@ -1523,6 +1718,114 @@
       ? pythonChromaState.selectedChromaId
       : (skinMonitorState?.skinId || null);
 
+    const baseSkinId = extractSkinIdFromData(skinData);
+    const resolvedChampionId = getChampionIdFromContext(skinData, baseSkinId, null) || 
+                      skinData.championId || 
+                      (Number.isFinite(baseSkinId) ? Math.floor(baseSkinId / 1000) : null);
+
+    // SPECIAL CASE: Check for special skins FIRST (before LCU API data)
+    // Elementalist Lux (skin ID 99007) - use local Forms data
+    if (baseSkinId === 99007 || (99991 <= baseSkinId && baseSkinId <= 99999)) {
+      log.debug(`[getChromaData] Elementalist Lux detected (base skin: 99007) - using local Forms data`);
+      const forms = getElementalistForms();
+      const baseFormId = 99007; // Always use base skin ID for Elementalist Lux
+      const luxChampionId = 99; // Lux champion ID
+      
+      // Base skin (Elementalist Lux base)
+      const baseSkinChroma = {
+        id: baseFormId,
+        name: "Default",
+        imagePath: getLocalPreviewPath(luxChampionId, baseFormId, baseFormId, true),
+        colors: [],
+        primaryColor: null,
+        selected: false,
+        locked: false,
+        buttonIconPath: getElementalistButtonIconPath(baseFormId),
+      };
+      
+      // Forms (fake IDs 99991-99999)
+      const formList = forms.map((form) => ({
+        id: form.id,
+        name: form.name,
+        imagePath: getLocalPreviewPath(luxChampionId, baseFormId, form.id, false),
+        colors: form.colors || [],
+        primaryColor: null, // Forms don't have colors
+        selected: false,
+        locked: false, // Forms are clickable (locking is just visual in the official client)
+        buttonIconPath: getElementalistButtonIconPath(form.id),
+        form_path: form.form_path,
+      }));
+      
+      const allChromas = [baseSkinChroma, ...formList];
+      return markSelectedChroma(allChromas, currentSkinId);
+    }
+
+    // SPECIAL CASE: Risen Legend Kai'Sa (skin ID 145070) or Immortalized Legend (145071)
+    if (baseSkinId === 145070 || baseSkinId === 145071) {
+      log.debug(`[getChromaData] Risen Legend Kai'Sa detected (base skin: 145070) - using local HOL chroma data`);
+      const holChromas = getKaisaHolChromas();
+      const actualBaseSkinId = 145070; // Always use base skin ID
+      const kaisaChampionId = 145; // Kai'Sa champion ID
+      
+      // Base skin (Risen Legend Kai'Sa)
+      const baseSkinChroma = {
+        id: actualBaseSkinId,
+        name: "Default",
+        imagePath: getLocalPreviewPath(kaisaChampionId, actualBaseSkinId, actualBaseSkinId, true),
+        colors: [],
+        primaryColor: null,
+        selected: false,
+        locked: false,
+      };
+      
+      // HOL chroma (Immortalized Legend)
+      const holChromaList = holChromas.map((chroma) => ({
+        id: chroma.id,
+        name: chroma.name,
+        imagePath: getLocalPreviewPath(kaisaChampionId, actualBaseSkinId, chroma.id, false),
+        colors: chroma.colors || [],
+        primaryColor: null,
+        selected: false,
+        locked: false, // HOL chromas are clickable
+      }));
+      
+      const allChromas = [baseSkinChroma, ...holChromaList];
+      return markSelectedChroma(allChromas, currentSkinId);
+    }
+
+    // SPECIAL CASE: Risen Legend Ahri (skin ID 103085) or Immortalized Legend (103086)
+    if (baseSkinId === 103085 || baseSkinId === 103086) {
+      log.debug(`[getChromaData] Risen Legend Ahri detected (base skin: 103085) - using local HOL chroma data`);
+      const holChromas = getAhriHolChromas();
+      const actualBaseSkinId = 103085; // Always use base skin ID
+      const ahriChampionId = 103; // Ahri champion ID
+      
+      // Base skin (Risen Legend Ahri)
+      const baseSkinChroma = {
+        id: actualBaseSkinId,
+        name: "Default",
+        imagePath: getLocalPreviewPath(ahriChampionId, actualBaseSkinId, actualBaseSkinId, true),
+        colors: [],
+        primaryColor: null,
+        selected: false,
+        locked: false,
+      };
+      
+      // HOL chroma (Immortalized Legend)
+      const holChromaList = holChromas.map((chroma) => ({
+        id: chroma.id,
+        name: chroma.name,
+        imagePath: getLocalPreviewPath(ahriChampionId, actualBaseSkinId, chroma.id, false),
+        colors: chroma.colors || [],
+        primaryColor: null,
+        selected: false,
+        locked: false, // HOL chromas are clickable
+      }));
+      
+      const allChromas = [baseSkinChroma, ...holChromaList];
+      return markSelectedChroma(allChromas, currentSkinId);
+    }
+
     // First, check if chromas are directly in the skinData (like official client)
     // The official client gets chromas from the Ember component context
     if (Array.isArray(skinData.chromas) && skinData.chromas.length > 0) {
@@ -1614,7 +1917,6 @@
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
-    const baseSkinId = extractSkinIdFromData(skinData);
     log.debug(`[getChromaData] Checking cached chromas for base skin ${baseSkinId}`);
     const cachedChromas = getCachedChromasForSkin(baseSkinId);
     if (cachedChromas.length > 0) {
@@ -1648,10 +1950,10 @@
     log.debug(`[getChromaData] No chromas found in cache for skin ${baseSkinId}, using fallback`);
     const fallbackSkinId = baseSkinId ?? skinData.id;
     const effectiveSkinId = getNumericId(fallbackSkinId);
-    const championId =
+    const fallbackChampionId =
       skinData.championId || getChampionIdFromContext(skinData, effectiveSkinId);
-    const resolvedChampionId =
-      championId || (Number.isFinite(effectiveSkinId)
+    const finalChampionId =
+      fallbackChampionId || (Number.isFinite(effectiveSkinId)
         ? Math.floor(effectiveSkinId / 1000)
         : null);
 
@@ -1660,11 +1962,7 @@
       return [];
     }
 
-    const fallbackChampionId = resolvedChampionId;
-    const championForImages =
-      fallbackChampionId ?? (Number.isFinite(effectiveSkinId)
-        ? Math.floor(effectiveSkinId / 1000)
-        : null);
+    const championForImages = finalChampionId;
     if (!championForImages) {
       log.debug(`[getChromaData] Could not determine champion ID for skin ${effectiveSkinId}`);
       return [];
@@ -1827,6 +2125,7 @@
         primaryColor: selectedChroma.primaryColor || selectedChroma.colors?.[1] || selectedChroma.colors?.[0] || null,
         colors: selectedChroma.colors || [],
         name: selectedChroma.name,
+        buttonIconPath: selectedChroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms
       };
       
       // Note: selectedChromaData will be updated by Python's chroma-state message
@@ -1913,40 +2212,69 @@
       const contents = document.createElement("div");
       contents.className = "contents";
       
-      // Check if this is the base/default skin button
-      const isDefaultButton = chroma.name === "Default" && !chroma.primaryColor && !chroma.colors?.length;
-      
-      if (isDefaultButton) {
-        // Base/default button: use the original gradient (beige with red stripe) - matching official League
-        contents.style.background = "linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2)";
+      // Check if this is Elementalist Lux form (has buttonIconPath)
+      if (chroma.buttonIconPath && chroma.buttonIconPath.startsWith("local-asset://")) {
+        // Elementalist Lux form - use local button icon
+        // Format: local-asset://elementalist_buttons/{form_id}.png
+        const iconPath = chroma.buttonIconPath.replace("local-asset://", "");
+        
+        // Request button icon from Python via bridge
+        sendToBridge({
+          type: "request-local-asset",
+          assetPath: iconPath,
+          chromaId: chroma.id,
+          timestamp: Date.now(),
+        });
+        
+        // Store pending request so we can apply the URL when Python responds
+        pendingLocalAssets.set(chroma.id, { contents, chroma });
+        
+        log.debug(`[ChromaWheel] Requested local button icon: ${iconPath} for chroma ${chroma.id}`);
+        
+        // Use placeholder until Python serves the image
+        contents.style.background = "";
+        contents.style.backgroundImage = "";
+        contents.style.backgroundColor = "#1e2328"; // Dark placeholder
         contents.style.backgroundSize = "cover";
         contents.style.backgroundPosition = "center";
         contents.style.backgroundRepeat = "no-repeat";
-        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using default gradient`);
+        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using local button icon (placeholder until Python serves)`);
       } else {
-        // Chroma buttons: use chroma color if available, otherwise fall back to image
-        const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
-        if (primaryColor) {
-          // Ensure color has # prefix
-          const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
-          // Use solid background color (no gradient to avoid darkening)
-          contents.style.backgroundColor = color;
-          contents.style.background = color;
-          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
-        } else if (chroma.imagePath) {
-          // Fall back to image if no color available
-          contents.style.background = `url('${chroma.imagePath}')`;
+        // Check if this is the base/default skin button
+        const isDefaultButton = chroma.name === "Default" && !chroma.primaryColor && !chroma.colors?.length;
+        
+        if (isDefaultButton) {
+          // Base/default button: use the original gradient (beige with red stripe) - matching official League
+          contents.style.background = "linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2)";
           contents.style.backgroundSize = "cover";
           contents.style.backgroundPosition = "center";
           contents.style.backgroundRepeat = "no-repeat";
-          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath}`);
+          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using default gradient`);
         } else {
-          // Default fallback color if no color or image is available
-          contents.style.background = "linear-gradient(135deg, #f0e6d2 0%, #f0e6d2 50%, #f0e6d2 50%, #f0e6d2 100%)";
-          contents.style.backgroundSize = "cover";
-          contents.style.backgroundPosition = "center";
-          contents.style.backgroundRepeat = "no-repeat";
-          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - no color or image, using default`);
+          // Chroma buttons: use chroma color if available, otherwise fall back to image
+          const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
+          if (primaryColor) {
+            // Ensure color has # prefix
+            const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
+            // Use solid background color (no gradient to avoid darkening)
+            contents.style.backgroundColor = color;
+            contents.style.background = color;
+            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
+          } else if (chroma.imagePath) {
+            // Fall back to image if no color available
+            contents.style.background = `url('${chroma.imagePath}')`;
+            contents.style.backgroundSize = "cover";
+            contents.style.backgroundPosition = "center";
+            contents.style.backgroundRepeat = "no-repeat";
+            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath}`);
+          } else {
+            // Default fallback color if no color or image is available
+            contents.style.background = "linear-gradient(135deg, #f0e6d2 0%, #f0e6d2 50%, #f0e6d2 50%, #f0e6d2 100%)";
+            contents.style.backgroundSize = "cover";
+            contents.style.backgroundPosition = "center";
+            contents.style.backgroundRepeat = "no-repeat";
+            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - no color or image, using default`);
+          }
         }
       }
 
@@ -2108,19 +2436,54 @@
   }
 
   function updateChromaPreview(chroma, chromaImage) {
-    // Update preview image using chroma imagePath from LCU API
-    // The official client uses chroma preview images with contain sizing
+    // Update preview image using chroma imagePath
+    // For special skins (Elementalist Lux, HOL chromas), use local preview paths
+    // For regular chromas, use LCU API paths
     const imagePath = chroma.imagePath;
     
     if (imagePath) {
-      // Use the chroma preview image (official client behavior)
-      // Match official client: background-size: contain (not cover) to avoid zooming
-      chromaImage.style.background = "";
-      chromaImage.style.backgroundImage = `url('${imagePath}')`;
-      chromaImage.style.backgroundSize = "contain"; // Match official client - contain fits entire image
-      chromaImage.style.backgroundPosition = "center";
-      chromaImage.style.backgroundRepeat = "no-repeat";
-      chromaImage.style.display = "";
+      // Check if this is a local preview path (special skins)
+      if (imagePath.startsWith("local-preview://")) {
+        // Request preview image from Python via bridge
+        // Format: local-preview://{champion_id}/{skin_id}/{chroma_id}/{chroma_id}.png
+        const pathParts = imagePath.replace("local-preview://", "").split("/");
+        if (pathParts.length >= 4) {
+          const championId = pathParts[0];
+          const skinId = pathParts[1];
+          const chromaId = pathParts[2];
+          
+          // Request preview from Python
+          sendToBridge({
+            type: "request-local-preview",
+            championId: parseInt(championId),
+            skinId: parseInt(skinId),
+            chromaId: parseInt(chromaId),
+            timestamp: Date.now(),
+          });
+          
+          // Store pending request so we can apply the URL when Python responds
+          pendingLocalPreviews.set(parseInt(chromaId), { chromaImage, chroma });
+          
+          log.debug(`[ChromaWheel] Requested local preview for champion ${championId}, skin ${skinId}, chroma ${chromaId}`);
+          
+          // Hide until Python serves the image
+          chromaImage.style.background = "";
+          chromaImage.style.backgroundImage = "";
+          chromaImage.style.display = "none";
+        } else {
+          chromaImage.style.display = "none";
+        }
+      } else {
+        // Regular LCU API path
+        // Use the chroma preview image (official client behavior)
+        // Match official client: background-size: contain (not cover) to avoid zooming
+        chromaImage.style.background = "";
+        chromaImage.style.backgroundImage = `url('${imagePath}')`;
+        chromaImage.style.backgroundSize = "contain"; // Match official client - contain fits entire image
+        chromaImage.style.backgroundPosition = "center";
+        chromaImage.style.backgroundRepeat = "no-repeat";
+        chromaImage.style.display = "";
+      }
     } else {
       // Hide if no image path available
       chromaImage.style.display = "none";
@@ -2129,6 +2492,7 @@
 
   function updateChromaButtonColor() {
     // Update the chroma button's content background to match selected chroma
+    // For Elementalist Lux forms: use button icon image
     // If default chroma (no color), keep the button-chroma.png image
     // If chroma has color, use that color as background
     const buttons = document.querySelectorAll(BUTTON_SELECTOR);
@@ -2139,10 +2503,73 @@
         return;
       }
 
+      // Check if this chroma has a button icon path (Elementalist Lux forms)
+      if (selectedChromaData && selectedChromaData.buttonIconPath && selectedChromaData.buttonIconPath.startsWith("local-asset://")) {
+        // Elementalist Lux form - always request the icon to ensure it matches the selected chroma
+        // Track the last applied chroma ID on the button to detect when switching forms
+        const lastAppliedChromaId = content.getAttribute("data-last-chroma-id");
+        const chromaIdChanged = lastAppliedChromaId !== String(selectedChromaData.id);
+        
+        // Check if we already have a pending request for THIS specific chroma ID
+        const hasPendingRequestForThisChroma = pendingLocalAssets.has(selectedChromaData.id);
+        
+        // Always request if:
+        // 1. Chroma ID changed (switching between forms)
+        // 2. No pending request for this chroma ID (new request needed)
+        // This ensures the icon updates immediately when switching between forms
+        if (chromaIdChanged || !hasPendingRequestForThisChroma) {
+          const iconPath = selectedChromaData.buttonIconPath.replace("local-asset://", "");
+          
+          // Request button icon from Python via bridge
+          sendToBridge({
+            type: "request-local-asset",
+            assetPath: iconPath,
+            chromaId: selectedChromaData.id,
+            timestamp: Date.now(),
+          });
+          
+          // Store pending request so we can apply the URL when Python responds
+          pendingLocalAssets.set(selectedChromaData.id, { contents: content, chroma: selectedChromaData });
+          
+          // Mark that we're requesting this chroma ID
+          content.setAttribute("data-last-chroma-id", String(selectedChromaData.id));
+          
+          log.debug(`[ChromaWheel] Requested button icon for chroma selection button: ${iconPath} for chroma ${selectedChromaData.id} (chromaIdChanged: ${chromaIdChanged})`);
+          
+          // Only show placeholder if there's no existing icon
+          // If we're switching between forms, keep the old icon visible until the new one loads (prevents flicker)
+          const existingBgImage = content.style.backgroundImage;
+          const hasExistingIcon = existingBgImage && existingBgImage !== "none" && existingBgImage !== "";
+          
+          if (!hasExistingIcon) {
+            // No existing icon - show placeholder
+            content.style.setProperty("background", "", "important");
+            content.style.setProperty("background-image", "", "important");
+            content.style.setProperty("background-color", "#1e2328", "important");
+            content.style.setProperty("background-size", "contain", "important");
+            content.style.setProperty("background-position", "center", "important");
+            content.style.setProperty("background-repeat", "no-repeat", "important");
+            log.debug(`[ChromaWheel] Button icon: using placeholder until Python serves ${iconPath}`);
+          } else {
+            // Existing icon present - keep it visible while new one loads (prevents flicker)
+            log.debug(`[ChromaWheel] Button icon: keeping existing icon visible while new icon loads for chroma ${selectedChromaData.id}`);
+          }
+        } else {
+          // Icon already loaded and request already pending for this chroma - keep it
+          log.debug(`[ChromaWheel] Button icon already loaded and pending for chroma ${selectedChromaData.id}, keeping existing icon`);
+        }
+        return;
+      }
+
       // Check if this is the default chroma (no color or name is "Default")
+      // BUT: For Elementalist Lux, even the "Default" button should show its icon, not the generic default
+      const isElementalistLux = selectedChromaData && (
+        selectedChromaData.id === 99007 || 
+        (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999)
+      );
       const isDefault = !selectedChromaData || 
-                       selectedChromaData.name === "Default" || 
-                       !selectedChromaData.primaryColor ||
+                       (selectedChromaData.name === "Default" && !isElementalistLux) || 
+                       (!selectedChromaData.primaryColor && !isElementalistLux) ||
                        selectedChromaData.id === 0;
 
       if (isDefault) {
@@ -2198,6 +2625,7 @@
       primaryColor: chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0] || null,
       colors: chroma.colors || [],
       name: chroma.name,
+      buttonIconPath: chroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms
     };
     
     // Update button color immediately
