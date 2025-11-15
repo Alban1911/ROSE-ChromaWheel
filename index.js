@@ -1821,14 +1821,15 @@
 
   function updateChromaPreview(chroma, chromaImage) {
     // Update preview image using chroma imagePath from LCU API
-    // The official client uses chroma preview images
+    // The official client uses chroma preview images with contain sizing
     const imagePath = chroma.imagePath;
     
     if (imagePath) {
       // Use the chroma preview image (official client behavior)
+      // Match official client: background-size: contain (not cover) to avoid zooming
       chromaImage.style.background = "";
       chromaImage.style.backgroundImage = `url('${imagePath}')`;
-      chromaImage.style.backgroundSize = "cover";
+      chromaImage.style.backgroundSize = "contain"; // Match official client - contain fits entire image
       chromaImage.style.backgroundPosition = "center";
       chromaImage.style.backgroundRepeat = "no-repeat";
       chromaImage.style.display = "";
