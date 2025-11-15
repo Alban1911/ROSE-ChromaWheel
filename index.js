@@ -1525,25 +1525,11 @@
 
     const chromaImage = document.createElement("div");
     chromaImage.className = "chroma-information-image";
-    // Set initial preview - use color if available, otherwise fall back to image
+    // Set initial preview - use selected chroma if available, otherwise first chroma
+    // This matches the official client behavior
     if (chromas.length > 0) {
-      const firstChroma = chromas[0];
-      const primaryColor = firstChroma.primaryColor || firstChroma.colors?.[1] || firstChroma.colors?.[0];
-      if (primaryColor) {
-        // Ensure color has # prefix
-        const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
-        // Use gradient background matching official League style
-        chromaImage.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
-        chromaImage.style.backgroundImage = ""; // Clear image if set
-        chromaImage.style.display = ""; // Ensure it's visible
-      } else if (firstChroma.imagePath) {
-        chromaImage.style.background = ""; // Clear gradient if set
-        chromaImage.style.backgroundImage = `url('${firstChroma.imagePath}')`;
-        chromaImage.style.display = ""; // Ensure it's visible
-      } else {
-        // Hide the image element when no image or color is available
-        chromaImage.style.display = "none";
-      }
+      const selectedChroma = chromas.find(c => c.selected) || chromas[0];
+      updateChromaPreview(selectedChroma, chromaImage, skinData);
     } else {
       // Hide the image element when no chromas are available
       chromaImage.style.display = "none";
@@ -1664,9 +1650,24 @@
       if (!chroma.locked) {
         chromaButton.addEventListener("click", (e) => {
           e.stopPropagation();
-          selectChroma(chroma, chromas, chromaImage, chromaButton, scrollable);
+          selectChroma(chroma, chromas, chromaImage, chromaButton, scrollable, skinData);
         });
       }
+
+      // Add hover handlers to update preview (matching official client behavior)
+      chromaButton.addEventListener("mouseenter", (e) => {
+        e.stopPropagation();
+        updateChromaPreview(chroma, chromaImage, skinData);
+      });
+
+      chromaButton.addEventListener("mouseleave", (e) => {
+        e.stopPropagation();
+        // Reset to currently selected chroma when not hovering
+        const selectedChroma = chromas.find(c => c.selected);
+        if (selectedChroma) {
+          updateChromaPreview(selectedChroma, chromaImage, skinData);
+        }
+      });
     });
 
     log.info(`[ChromaWheel] Created ${buttonCount} chroma buttons in panel`);
@@ -1775,12 +1776,57 @@
     });
   }
 
+  function updateChromaPreview(chroma, chromaImage, skinData) {
+    // Update preview image - prioritize image path over color (matches official client)
+    // The official client uses chroma preview images, not just color gradients
+    let imagePath = chroma.imagePath;
+    
+    // For default/base chroma with no imagePath, try to construct one
+    if (!imagePath && chroma.name === "Default" && chroma.id) {
+      // Try to construct base skin preview path
+      // Pattern: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
+      const skinId = chroma.id;
+      const championId = skinData?.championId || Math.floor(skinId / 1000);
+      if (championId && skinId) {
+        // Try base skin path (skinId with 000 suffix or just skinId)
+        imagePath = `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${skinId}.png`;
+      }
+    }
+    
+    if (imagePath) {
+      // Use the chroma preview image (official client behavior)
+      chromaImage.style.background = ""; // Clear any gradient
+      chromaImage.style.backgroundImage = `url('${imagePath}')`;
+      chromaImage.style.backgroundSize = "cover";
+      chromaImage.style.backgroundPosition = "center";
+      chromaImage.style.backgroundRepeat = "no-repeat";
+      chromaImage.style.display = ""; // Show the element
+    } else {
+      // Fallback to color gradient if no image available
+      const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
+      if (primaryColor) {
+        // Ensure color has # prefix
+        const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
+        // Use gradient background matching official League style
+        chromaImage.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
+        chromaImage.style.backgroundImage = ""; // Clear image if set
+        chromaImage.style.display = ""; // Show the element
+      } else {
+        // For default/base chroma with no image or color, keep it visible but empty
+        chromaImage.style.display = ""; // Keep it visible
+        chromaImage.style.background = "";
+        chromaImage.style.backgroundImage = "";
+      }
+    }
+  }
+
   function selectChroma(
     chroma,
     allChromas,
     chromaImage,
     clickedButton,
-    scrollable
+    scrollable,
+    skinData
   ) {
     // Update selected state
     allChromas.forEach((c) => {
@@ -1793,22 +1839,8 @@
     });
     clickedButton.classList.add("selected");
 
-    // Update preview image - use color if available, otherwise fall back to image
-    const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
-    if (primaryColor) {
-      // Ensure color has # prefix
-      const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
-      // Use gradient background matching official League style
-      chromaImage.style.background = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
-      chromaImage.style.backgroundImage = ""; // Clear image if set
-      chromaImage.style.display = ""; // Show the element
-    } else if (chroma.imagePath) {
-      chromaImage.style.background = ""; // Clear gradient if set
-      chromaImage.style.backgroundImage = `url('${chroma.imagePath}')`;
-      chromaImage.style.display = ""; // Show the element
-    } else {
-      chromaImage.style.display = "none"; // Hide when no image or color
-    }
+    // Update preview image using the shared function
+    updateChromaPreview(chroma, chromaImage, skinData);
 
     // Try to set the skin via API
     if (window.fetch) {
