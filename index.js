@@ -33,6 +33,33 @@
   let bridgeReady = false;
   let bridgeQueue = [];
 
+  // Audio: play official chroma click sound when a chroma panel button is clicked
+  // Using the same endpoint the client uses: sfx-cs-button-chromas-click.ogg
+  const CHROMA_CLICK_SOUND_URL =
+    "https://127.0.0.1:65236/fe/lol-champ-select/sounds/sfx-cs-button-chromas-click.ogg";
+
+  let chromaClickAudio = null;
+  function playChromaClickSound() {
+    try {
+      if (!chromaClickAudio) {
+        chromaClickAudio = new Audio(CHROMA_CLICK_SOUND_URL);
+      } else {
+        // Reset playback so rapid clicks replay the sound from the start
+        chromaClickAudio.currentTime = 0;
+      }
+      chromaClickAudio.play().catch((err) => {
+        // Ignore playback errors (e.g. autoplay restrictions) but log for debugging
+        if (window?.console) {
+          console.debug("[ChromaWheel] Failed to play chroma click sound:", err);
+        }
+      });
+    } catch (err) {
+      if (window?.console) {
+        console.debug("[ChromaWheel] Error initializing chroma click sound:", err);
+      }
+    }
+  }
+
   const CSS_RULES = `
     .${BUTTON_CLASS} {
       pointer-events: auto;
@@ -2578,6 +2605,8 @@
         e.stopPropagation();
         e.preventDefault();
         log.info(`[ChromaWheel] Chroma button clicked: ${chroma.name} (ID: ${chroma.id}, locked: ${chroma.locked})`);
+        // Play official chroma click sound (matches Riot's sfx-cs-button-chromas-click.ogg)
+        playChromaClickSound();
         selectChroma(chroma, chromas, chromaImage, chromaButton, scrollable);
       };
       chromaButton.addEventListener("click", handleClick);
