@@ -317,7 +317,7 @@
 
     .${PANEL_CLASS} .chroma-selection li {
       list-style: none;
-      margin: 0;
+      margin: 2px 4px; /* Add 1px extra horizontal spacing between buttons */
       padding: 0;
       display: flex;
       align-items: center;
@@ -332,14 +332,21 @@
       border: none;
       display: flex;
       height: 26px;
+      width: 26px;
+      min-width: 26px;
+      min-height: 26px;
+      max-width: 26px;
+      max-height: 26px;
+      aspect-ratio: 1 / 1; /* Force square to keep outer circle circular under scaling */
       justify-content: center;
       margin: 0;
       padding: 0;
-      width: 26px;
       cursor: pointer;
       box-sizing: border-box;
       background: transparent !important;
       background-color: transparent !important;
+      flex: 0 0 26px; /* Fixed size in flex to prevent any stretching */
+      transform: scale(1); /* Override any parent scaling transforms */
     }
 
     .${PANEL_CLASS}[data-no-button] .chroma-skin-button {
@@ -365,17 +372,25 @@
       border-radius: 50%;
       display: flex;
       height: 18px;
-      justify-content: center;
       width: 18px;
+      min-width: 18px;
+      min-height: 18px;
+      max-width: 18px;
+      max-height: 18px;
+      aspect-ratio: 1 / 1; /* Force inner circle to remain perfectly circular */
+      justify-content: center;
       background: linear-gradient(135deg, #27211C 0%, #27211C 50%, #27211C 50%, #27211C 100%);
+      box-shadow: 0 0 0 2px transparent; /* Reserve space for the hover ring so layout never shifts */
       opacity: 1 !important; /* All button contents at 100% opacity always */
+      transform: scale(1); /* Override any parent scaling transforms */
       /* Background will be set/overridden inline based on chroma color */
     }
 
-    /* Selected / hover state: golden ring around the inner circle, so scaling keeps it circular */
+    /* Selected / hover state: just change ring color, thickness is constant so no squeezing */
     .${PANEL_CLASS} .chroma-skin-button.selected .contents,
     .${PANEL_CLASS} .chroma-skin-button:hover .contents {
       box-shadow: 0 0 0 2px #c89b3c;
+      transform: scale(1); /* Maintain perfect circle even on hover */
     }
     
     /* All buttons at 100% opacity, no variation on hover or state */
