@@ -440,6 +440,9 @@
                 } else if (data && data.type === "champion-locked") {
                   // Handle champion lock state update
                   handleChampionLocked(data);
+                } else if (data && data.type === "phase-change") {
+                  // Handle phase change (including game mode info from Python)
+                  handlePhaseChangeFromPython(data);
                 }
               } catch (error) {
                 // Not JSON or invalid - ignore
@@ -526,6 +529,17 @@
     // Handle local asset URL response from Python
     const { assetPath, chromaId, url } = data;
     log.debug(`[ChromaWheel] Received local asset URL: ${url} for chroma ${chromaId}`);
+
+    // Special handling: ARAM background image for the panel
+    if (assetPath === ARAM_BACKGROUND_ASSET_PATH && url) {
+      aramBackgroundImageUrl = url;
+      aramBackgroundRequestPending = false;
+
+      if (currentChromaInfoElement) {
+        currentChromaInfoElement.style.backgroundImage = `url('${url}')`;
+        log.debug("[ChromaWheel] Applied ARAM background image to chroma panel");
+      }
+    }
     
     // Find the button contents element that requested this asset
     const pending = pendingLocalAssets.get(chromaId);
@@ -813,6 +827,61 @@
     
     // Update button color
     updateChromaButtonColor();
+  }
+
+  function handlePhaseChangeFromPython(data) {
+    // Use Python-detected game mode to drive ARAM detection for the JS panel
+    try {
+      const phase = data.phase;
+      const gameMode = data.gameMode;
+      const mapId = data.mapId;
+
+      if (phase === "ChampSelect" || phase === "FINALIZATION") {
+        const isAram =
+          mapId === 12 ||
+          (typeof gameMode === "string" &&
+            gameMode.toUpperCase() === "ARAM");
+
+        isAramFromPython = Boolean(isAram);
+      } else {
+        // Leaving champ select / finalization – clear flag
+        isAramFromPython = false;
+      }
+    } catch (e) {
+      // Fail silently – fallback to Ember-based detection
+    }
+  }
+
+  function requestAramBackgroundImage() {
+    // Request ARAM panel background image from Python when in ARAM game modes
+    if (aramBackgroundImageUrl || aramBackgroundRequestPending) {
+      return;
+    }
+
+    aramBackgroundRequestPending = true;
+
+    const payload = {
+      type: "request-local-asset",
+      assetPath: ARAM_BACKGROUND_ASSET_PATH,
+      timestamp: Date.now(),
+    };
+
+    log.debug(
+      "[ChromaWheel] Requesting ARAM background image from Python",
+      { assetPath: ARAM_BACKGROUND_ASSET_PATH }
+    );
+
+    if (bridgeReady && bridgeSocket && bridgeSocket.readyState === WebSocket.OPEN) {
+      try {
+        bridgeSocket.send(JSON.stringify(payload));
+      } catch (e) {
+        aramBackgroundRequestPending = false;
+        log.debug("[ChromaWheel] Failed to send ARAM background request, queuing", e);
+        bridgeQueue.push(JSON.stringify(payload));
+      }
+    } else {
+      bridgeQueue.push(JSON.stringify(payload));
+    }
   }
 
   const log = {
@@ -1367,53 +1436,93 @@
     return button;
   }
 
-  function isSwiftplayMode() {
-    // Check if game mode is Swiftplay
-    try {
-      if (window.Ember) {
-        const championSelectEl = document.querySelector(".champion-select");
-        if (championSelectEl) {
-          if (window.Ember.getOwner) {
-            const application = window.Ember.getOwner(championSelectEl);
-            if (application) {
-              const rootComponent = application.lookup(
-                "component:champion-select"
-              );
-              if (rootComponent) {
-                const gameMode = rootComponent.get("gameMode");
-                if (
-                  gameMode &&
-                  (gameMode.toLowerCase().includes("swiftplay") ||
-                    gameMode === "SWIFTPLAY")
-                ) {
-                  return true;
-                }
-              }
-            }
-          }
+  const ARAM_BACKGROUND_ASSET_PATH = "champ-select-flyout-background-aram.png";
+  let aramBackgroundImageUrl = null;
+  let aramBackgroundRequestPending = false;
+  let currentChromaInfoElement = null;
+  let isAramFromPython = false; // Preferred ARAM detection source (via WebSocket)
 
-          // Try accessing via __ember_view__
-          const emberView =
-            championSelectEl.__ember_view__ || championSelectEl._view;
-          if (emberView) {
-            const context = emberView.context || emberView._context;
-            if (context) {
-              const gameMode =
-                context.gameMode ||
-                (context.gameflow &&
-                  context.gameflow.gameData &&
-                  context.gameflow.gameData.queue &&
-                  context.gameflow.gameData.queue.gameMode);
-              if (
-                gameMode &&
-                (gameMode.toLowerCase().includes("swiftplay") ||
-                  gameMode === "SWIFTPLAY")
-              ) {
-                return true;
-              }
+  function getGameModeFromEmber() {
+    try {
+      if (!window.Ember) {
+        return null;
+      }
+
+      const championSelectEl = document.querySelector(".champion-select");
+      if (!championSelectEl) {
+        return null;
+      }
+
+      if (window.Ember.getOwner) {
+        const application = window.Ember.getOwner(championSelectEl);
+        if (application) {
+          const rootComponent = application.lookup(
+            "component:champion-select"
+          );
+          if (rootComponent) {
+            const gameMode = rootComponent.get("gameMode");
+            if (gameMode) {
+              return gameMode;
             }
           }
         }
+      }
+
+      // Fallback: try accessing via __ember_view__
+      const emberView =
+        championSelectEl.__ember_view__ || championSelectEl._view;
+      if (emberView) {
+        const context = emberView.context || emberView._context;
+        if (context) {
+          const gameMode =
+            context.gameMode ||
+            (context.gameflow &&
+              context.gameflow.gameData &&
+              context.gameflow.gameData.queue &&
+              context.gameflow.gameData.queue.gameMode);
+          if (gameMode) {
+            return gameMode;
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail
+    }
+
+    return null;
+  }
+
+  function isSwiftplayMode() {
+    // Check if game mode is Swiftplay
+    try {
+      const gameMode = getGameModeFromEmber();
+      if (
+        gameMode &&
+        (gameMode.toLowerCase().includes("swiftplay") ||
+          gameMode === "SWIFTPLAY")
+      ) {
+        return true;
+      }
+    } catch (e) {
+      // Silently fail
+    }
+    return false;
+  }
+
+  function isAramMode() {
+    // Check if current game mode is ARAM (Howling Abyss)
+    // Prefer Python-detected state from WebSocket when available.
+    if (isAramFromPython) {
+      return true;
+    }
+
+    try {
+      const gameMode = getGameModeFromEmber();
+      if (
+        gameMode &&
+        (gameMode.toLowerCase().includes("aram") || gameMode === "ARAM")
+      ) {
+        return true;
       }
     } catch (e) {
       // Silently fail
@@ -2269,8 +2378,24 @@
     // Chroma information section
     const chromaInfo = document.createElement("div");
     chromaInfo.className = "chroma-information";
-    const bgPath =
+    currentChromaInfoElement = chromaInfo;
+
+    // Default background (Summoner's Rift) - official client path
+    let bgPath =
       "lol-game-data/assets/content/src/LeagueClient/GameModeAssets/Classic_SRU/img/champ-select-flyout-background.jpg";
+
+    // If we're in ARAM mode, try to use the locally-served ARAM background
+    if (isAramMode()) {
+      if (aramBackgroundImageUrl) {
+        bgPath = aramBackgroundImageUrl;
+        log.debug("[ChromaWheel] Using cached ARAM background image for chroma panel");
+      } else {
+        // Request ARAM background from Python; keep SR background as temporary fallback
+        requestAramBackgroundImage();
+        log.debug("[ChromaWheel] ARAM mode detected - requesting ARAM background image");
+      }
+    }
+
     chromaInfo.style.backgroundImage = `url('${bgPath}')`;
 
     const chromaImage = document.createElement("div");
