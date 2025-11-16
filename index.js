@@ -328,15 +328,16 @@
       pointer-events: all;
       align-items: center;
       border-radius: 50%;
-      border: none; /* No default border to ensure proper centering */
+      box-shadow: 0 0 2px #010a13;
+      border: none;
       display: flex;
       height: 26px;
       justify-content: center;
-      margin: 0; /* Ensure no margin affects centering */
-      padding: 0; /* Ensure no padding affects centering */
+      margin: 0;
+      padding: 0;
       width: 26px;
       cursor: pointer;
-      box-sizing: border-box; /* Consistent box model */
+      box-sizing: border-box;
       background: transparent !important;
       background-color: transparent !important;
     }
@@ -351,23 +352,6 @@
       opacity: 1 !important; /* Always 100% opacity for non-locked buttons */
     }
 
-    .${PANEL_CLASS} .chroma-skin-button.selected,
-    .${PANEL_CLASS} .chroma-skin-button:hover {
-      /* Selected and hover states: 2px golden border around the button */
-      border: 2px solid #c89b3c;
-      box-sizing: border-box;
-      /* Border is inside the 26px, so inner space is 22px */
-      background: transparent !important;
-      background-color: transparent !important;
-    }
-    
-    .${PANEL_CLASS} .chroma-skin-button.selected .contents,
-    .${PANEL_CLASS} .chroma-skin-button:hover .contents {
-      /* Create 2px gap on each side: 22px inner - 4px gap = 18px contents */
-      height: 18px;
-      width: 18px;
-    }
-
     .${PANEL_CLASS} .chroma-skin-button.locked {
       opacity: 1 !important; /* All buttons at 100% opacity, including locked */
       cursor: pointer;
@@ -375,14 +359,23 @@
     }
 
     .${PANEL_CLASS} .chroma-skin-button .contents {
+      pointer-events: all;
       align-items: center;
+      border: 2px solid #010a13;
       border-radius: 50%;
       display: flex;
       height: 18px;
       justify-content: center;
       width: 18px;
+      background: linear-gradient(135deg, #27211C 0%, #27211C 50%, #27211C 50%, #27211C 100%);
       opacity: 1 !important; /* All button contents at 100% opacity always */
-      /* Background will be set inline based on chroma color */
+      /* Background will be set/overridden inline based on chroma color */
+    }
+
+    /* Selected / hover state: golden ring around the inner circle, so scaling keeps it circular */
+    .${PANEL_CLASS} .chroma-skin-button.selected .contents,
+    .${PANEL_CLASS} .chroma-skin-button:hover .contents {
+      box-shadow: 0 0 0 2px #c89b3c;
     }
     
     /* All buttons at 100% opacity, no variation on hover or state */
