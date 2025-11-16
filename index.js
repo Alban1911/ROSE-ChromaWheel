@@ -67,7 +67,7 @@
       list-style-type: none;
       cursor: pointer;
       display: block !important;
-      bottom: 0;
+      bottom: 1px;
       height: 25px;
       left: 50%;
       position: absolute;
@@ -97,10 +97,14 @@
     }
 
     .${BUTTON_CLASS} .frame-color {
+      --champion-preview-hover-animation-percentage: 0%;
+      --column-height: 95px;
+      --font-display: "LoL Display","Times New Roman",Times,Baskerville,Georgia,serif;
+      --font-body: "LoL Body",Arial,"Helvetica Neue",Helvetica,sans-serif;
       pointer-events: auto;
       -webkit-user-select: none;
       list-style-type: none;
-      cursor: pointer;
+      cursor: default;
       background-image: linear-gradient(0deg,#695625 0,#a9852d 23%,#b88d35 93%,#c8aa6e);
       box-sizing: border-box;
       height: 100%;
