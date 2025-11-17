@@ -2,7 +2,7 @@
  * @name Rose-ChromaWheel
  * @author Rose Team
  * @description Chroma wheel for Pengu Loader
- * @link https://github.com/FlorentTariolle/Rose-ChromaWheel
+ * @link https://github.com/Alban1911/Rose-ChromaWheel
  */
 (function createFakeChromaButton() {
   const LOG_PREFIX = "[LU-ChromaButton]";
