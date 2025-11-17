@@ -406,7 +406,7 @@
 
   function emitBridgeLog(event, data = {}) {
     try {
-      const emitter = window?.__leagueUnlockedBridgeEmit;
+      const emitter = window?.__roseBridgeEmit;
       if (typeof emitter !== "function") {
         return;
       }
@@ -3243,8 +3243,8 @@
       return;
     }
 
-    if (window.__leagueUnlockedSkinState) {
-      skinMonitorState = window.__leagueUnlockedSkinState;
+    if (window.__roseSkinState) {
+      skinMonitorState = window.__roseSkinState;
       
       // Proactively fetch champion data if initial state has chromas
       if (skinMonitorState && skinMonitorState.hasChromas && skinMonitorState.championId && skinMonitorState.skinId) {
