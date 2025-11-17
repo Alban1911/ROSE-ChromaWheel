@@ -1,7 +1,8 @@
 /**
- * LU-ChromaButton Plugin
- * Creates a fake chroma button to replace the hidden official one
- * and implements the chroma selection panel
+ * @name Rose-ChromaWheel
+ * @author Rose Team
+ * @description Chroma wheel for Pengu Loader
+ * @link https://github.com/FlorentTariolle/Rose-ChromaWheel
  */
 (function createFakeChromaButton() {
   const LOG_PREFIX = "[LU-ChromaButton]";
