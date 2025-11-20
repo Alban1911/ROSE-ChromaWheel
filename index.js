@@ -29,10 +29,47 @@
   let championLocked = false; // Track if a champion is locked
   
   // WebSocket bridge for sending chroma selection to Python
-  const BRIDGE_URL = "ws://localhost:3000";
+  let BRIDGE_PORT = 3000; // Default, will be updated from /port endpoint
+  let BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
   let bridgeSocket = null;
   let bridgeReady = false;
   let bridgeQueue = [];
+  
+  // Load bridge port from /port endpoint
+  async function loadBridgePort() {
+    try {
+      // Try ports starting from 3000 to find the server
+      for (let port = 3000; port <= 3010; port++) {
+        try {
+          const response = await fetch(`http://localhost:${port}/port`);
+          if (response.ok) {
+            const portText = await response.text();
+            const fetchedPort = parseInt(portText.trim(), 10);
+            if (!isNaN(fetchedPort) && fetchedPort > 0) {
+              BRIDGE_PORT = fetchedPort;
+              BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+              if (window?.console) {
+                console.log(`${LOG_PREFIX} Loaded bridge port: ${BRIDGE_PORT}`);
+              }
+              return true;
+            }
+          }
+        } catch (e) {
+          // Try next port
+          continue;
+        }
+      }
+      if (window?.console) {
+        console.warn(`${LOG_PREFIX} Failed to load bridge port, using default (3000)`);
+      }
+      return false;
+    } catch (e) {
+      if (window?.console) {
+        console.warn(`${LOG_PREFIX} Error loading bridge port:`, e);
+      }
+      return false;
+    }
+  }
 
   // Audio: play official chroma click sound when a chroma panel button is clicked
   // Using the same endpoint the client uses: sfx-cs-button-chromas-click.ogg
@@ -3316,11 +3353,14 @@
     });
   }
 
-  function init() {
+  async function init() {
     if (!document || !document.head) {
       requestAnimationFrame(init);
       return;
     }
+
+    // Load bridge port before initializing socket
+    await loadBridgePort();
 
     subscribeToSkinMonitor();
     injectCSS();
