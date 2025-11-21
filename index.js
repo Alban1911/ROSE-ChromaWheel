@@ -3357,23 +3357,33 @@
   let _initialized = false;
 
   async function init() {
-    // Prevent multiple concurrent initializations
-    if (_initializing || _initialized) {
+    // Prevent multiple concurrent initializations (but allow recursive retry)
+    if (_initialized) {
       return;
     }
+    // If already initializing, only proceed if this is a recursive retry call
+    // (indicated by document being ready now when it wasn't before)
+    if (_initializing) {
+      // Allow recursive call to proceed only if document is now ready
+      if (!document || !document.head) {
+        return; // Still not ready, let the scheduled retry handle it
+      }
+      // Document is now ready, proceed with initialization
+    } else {
+      // First call - set flag BEFORE document check to prevent race condition
+      _initializing = true;
 
-    if (!document || !document.head) {
-      // Use synchronous wrapper to prevent multiple concurrent schedules
-      requestAnimationFrame(() => {
-        init().catch(err => {
-          log.error("Init failed:", err);
-          _initializing = false;
+      if (!document || !document.head) {
+        // Use synchronous wrapper to prevent multiple concurrent schedules
+        requestAnimationFrame(() => {
+          init().catch(err => {
+            log.error("Init failed:", err);
+            _initializing = false;
+          });
         });
-      });
-      return;
+        return;
+      }
     }
-
-    _initializing = true;
     try {
       // Load bridge port before initializing socket
       await loadBridgePort();
