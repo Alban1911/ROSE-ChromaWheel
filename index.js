@@ -3366,7 +3366,14 @@
     if (_initializing) {
       // Allow recursive call to proceed only if document is now ready
       if (!document || !document.head) {
-        return; // Still not ready, let the scheduled retry handle it
+        // Still not ready, schedule another retry
+        requestAnimationFrame(() => {
+          init().catch(err => {
+            log.error("Init failed:", err);
+            _initializing = false;
+          });
+        });
+        return;
       }
       // Document is now ready, proceed with initialization
     } else {
