@@ -14,7 +14,7 @@
     ".skin-name-text", // Classic Champ Select
     ".skin-name", // Swiftplay lobby
   ];
-  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 145070, 103085]);
+  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 82054, 25080, 145070, 103085]);
   const SPECIAL_CHROMA_SKIN_IDS = new Set([145071, 100001, 103086, 88888]);
   const chromaParentMap = new Map();
   let skinMonitorState = null;
@@ -742,6 +742,16 @@
       return id === 99007 || (id >= 99991 && id <= 99999);
     };
 
+    // Check if this is a Sahn Uzal Mordekaiser form (IDs 82998, 82999 or base 82054)
+    const isMordekaiser = (id) => {
+      return id === 82054 || id === 82998 || id === 82999;
+    };
+
+    // Check if this is a Spirit Blossom Morgana form (ID 25999 or base 25080)
+    const isMorgana = (id) => {
+      return id === 25080 || id === 25999;
+    };
+
     // Check if this is a HOL chroma (Kai'Sa or Ahri)
     const isHolChroma = (id) => {
       return id === 145070 || id === 145071 || id === 103085 || id === 103086;
@@ -751,6 +761,22 @@
     const getButtonIconPathForElementalist = (chromaId) => {
       if (isElementalistLux(chromaId)) {
         return getElementalistButtonIconPath(chromaId);
+      }
+      return null;
+    };
+
+    // Helper to get buttonIconPath for Sahn Uzal Mordekaiser forms
+    const getButtonIconPathForMordekaiser = (chromaId) => {
+      if (isMordekaiser(chromaId)) {
+        return getMordekaiserButtonIconPath(chromaId);
+      }
+      return null;
+    };
+
+    // Helper to get buttonIconPath for Spirit Blossom Morgana forms
+    const getButtonIconPathForMorgana = (chromaId) => {
+      if (isMorgana(chromaId)) {
+        return getMorganaButtonIconPath(chromaId);
       }
       return null;
     };
@@ -863,6 +889,92 @@
         }
         log.debug(
           `[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
+        );
+      } else if (isMordekaiser(data.selectedChromaId)) {
+        // Sahn Uzal Mordekaiser form - get data from local functions
+        const baseFormId = 82054;
+        const mordekaiserChampionId = 82;
+
+        // Check if it's the base form or a form
+        if (data.selectedChromaId === baseFormId) {
+          // Base form
+          selectedChromaData = {
+            id: data.selectedChromaId,
+            primaryColor: null,
+            colors: [],
+            name: "Default",
+            buttonIconPath: getMordekaiserButtonIconPath(baseFormId),
+          };
+        } else {
+          // Sahn Uzal Mordekaiser form (82998, 82999)
+          const forms = getMordekaiserForms();
+          const form = forms.find((f) => f.id === data.selectedChromaId);
+          if (form) {
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: form.name || "Selected",
+              buttonIconPath: getMordekaiserButtonIconPath(form.id),
+            };
+          } else {
+            // Form not found - use button icon path anyway
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: "Selected",
+              buttonIconPath: getMordekaiserButtonIconPath(
+                data.selectedChromaId
+              ),
+            };
+          }
+        }
+        log.debug(
+          `[ChromaWheel] Sahn Uzal Mordekaiser form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
+        );
+      } else if (isMorgana(data.selectedChromaId)) {
+        // Spirit Blossom Morgana form - get data from local functions
+        const baseFormId = 25080;
+        const morganaChampionId = 25;
+
+        // Check if it's the base form or a form
+        if (data.selectedChromaId === baseFormId) {
+          // Base form
+          selectedChromaData = {
+            id: data.selectedChromaId,
+            primaryColor: null,
+            colors: [],
+            name: "Default",
+            buttonIconPath: getMorganaButtonIconPath(baseFormId),
+          };
+        } else {
+          // Spirit Blossom Morgana form (25999)
+          const forms = getMorganaForms();
+          const form = forms.find((f) => f.id === data.selectedChromaId);
+          if (form) {
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: form.name || "Selected",
+              buttonIconPath: getMorganaButtonIconPath(form.id),
+            };
+          } else {
+            // Form not found - use button icon path anyway
+            selectedChromaData = {
+              id: data.selectedChromaId,
+              primaryColor: null,
+              colors: [],
+              name: "Selected",
+              buttonIconPath: getMorganaButtonIconPath(
+                data.selectedChromaId
+              ),
+            };
+          }
+        }
+        log.debug(
+          `[ChromaWheel] Spirit Blossom Morgana form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
       } else if (isHolChroma(data.selectedChromaId)) {
         // HOL chroma - get data from local functions
@@ -1011,10 +1123,14 @@
       }
     } else {
       // Default/base chroma selected
-      // Check if currentSkinId is Elementalist Lux base or HOL base
+      // Check if currentSkinId is Elementalist Lux base, Sahn Uzal Mordekaiser base, Spirit Blossom Morgana base, or HOL base
       let buttonIconPath = null;
       if (isElementalistLux(data.currentSkinId)) {
         buttonIconPath = getElementalistButtonIconPath(data.currentSkinId);
+      } else if (isMordekaiser(data.currentSkinId)) {
+        buttonIconPath = getMordekaiserButtonIconPath(data.currentSkinId);
+      } else if (isMorgana(data.currentSkinId)) {
+        buttonIconPath = getMorganaButtonIconPath(data.currentSkinId);
       } else if (isHolChroma(data.currentSkinId)) {
         // Determine base skin ID and champion ID for HOL
         let baseSkinId;
@@ -1310,6 +1426,44 @@
     return chromas;
   }
 
+  // Get Sahn Uzal Mordekaiser Forms data locally (same as Python's get_mordekaiser_forms)
+  function getMordekaiserForms() {
+    const forms = [
+      {
+        id: 82998,
+        name: "Form 1",
+        colors: [],
+        form_path: "Mordekaiser/Forms/Sahn Uzal Mordekaiser Form 1.zip",
+      },
+      {
+        id: 82999,
+        name: "Form 2",
+        colors: [],
+        form_path: "Mordekaiser/Forms/Sahn Uzal Mordekaiser Form 2.zip",
+      },
+    ];
+    log.debug(
+      `[getMordekaiserForms] Created ${forms.length} Sahn Uzal Mordekaiser Forms with real IDs (82998, 82999)`
+    );
+    return forms;
+  }
+
+  // Get Spirit Blossom Morgana Forms data locally (same as Python's get_morgana_forms)
+  function getMorganaForms() {
+    const forms = [
+      {
+        id: 25999,
+        name: "Form 1",
+        colors: [],
+        form_path: "Morgana/Forms/Spirit Blossom Morgana Form 1.zip",
+      },
+    ];
+    log.debug(
+      `[getMorganaForms] Created ${forms.length} Spirit Blossom Morgana Forms with real ID (25999)`
+    );
+    return forms;
+  }
+
   // Get local preview image path for special skins (like Python's ChromaPreviewManager)
   // Path structure: {champion_id}/{skin_id}/{chroma_id}/{chroma_id}.png
   // For base skin: {champion_id}/{skin_id}/{skin_id}.png
@@ -1334,6 +1488,26 @@
     // Python will return the local file path or serve it via HTTP
     // For now, construct the expected path structure
     const path = `local-asset://elementalist_buttons/${formId}.png`;
+    return path;
+  }
+
+  // Get local button icon path for Sahn Uzal Mordekaiser forms
+  // Path: assets/mordekaiser_buttons/{form_id}.png
+  function getMordekaiserButtonIconPath(formId) {
+    // Request icon path from Python via bridge
+    // Python will return the local file path or serve it via HTTP
+    // For now, construct the expected path structure
+    const path = `local-asset://mordekaiser_buttons/${formId}.png`;
+    return path;
+  }
+
+  // Get local button icon path for Spirit Blossom Morgana forms
+  // Path: assets/morgana_buttons/{form_id}.png
+  function getMorganaButtonIconPath(formId) {
+    // Request icon path from Python via bridge
+    // Python will return the local file path or serve it via HTTP
+    // For now, construct the expected path structure
+    const path = `local-asset://morgana_buttons/${formId}.png`;
     return path;
   }
 
@@ -1363,6 +1537,20 @@
     return (
       Number.isFinite(skinId) &&
       (SPECIAL_BASE_SKIN_IDS.has(skinId) || skinId === 99007)
+    );
+  }
+
+  function isMordekaiser(skinId) {
+    return (
+      Number.isFinite(skinId) &&
+      (skinId === 82054 || skinId === 82998 || skinId === 82999)
+    );
+  }
+
+  function isMorgana(skinId) {
+    return (
+      Number.isFinite(skinId) &&
+      (skinId === 25080 || skinId === 25999)
     );
   }
 
@@ -2011,7 +2199,13 @@
     }
 
     const isCurrent = isCurrentSkinItem(skinItem);
-    const hasChromas = Boolean(skinMonitorState?.hasChromas);
+    const currentSkinId = skinMonitorState?.skinId ?? null;
+    const hasChromas = Boolean(
+      skinMonitorState?.hasChromas || 
+      isSpecialBaseSkin(currentSkinId) || 
+      isMordekaiser(currentSkinId) ||
+      isMorgana(currentSkinId)
+    );
 
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
@@ -2024,7 +2218,6 @@
 
     // Only log current skin eval when skin actually changes
     const lastEval = ensureFakeButton._lastEval;
-    const currentSkinId = skinMonitorState?.skinId ?? null;
     if (
       !lastEval ||
       lastEval.skinId !== currentSkinId ||
@@ -2359,6 +2552,102 @@
         selected: false,
         locked: false, // Forms are clickable (locking is just visual in the official client)
         buttonIconPath: getElementalistButtonIconPath(form.id),
+        form_path: form.form_path,
+      }));
+
+      const allChromas = [baseSkinChroma, ...formList];
+      return markSelectedChroma(allChromas, currentSkinId);
+    }
+
+    // SPECIAL CASE: Sahn Uzal Mordekaiser (skin ID 82054) - use local Forms data
+    if (baseSkinId === 82054 || baseSkinId === 82998 || baseSkinId === 82999) {
+      log.debug(
+        `[getChromaData] Sahn Uzal Mordekaiser detected (base skin: 82054) - using local Forms data`
+      );
+      const forms = getMordekaiserForms();
+      const baseFormId = 82054; // Always use base skin ID for Sahn Uzal Mordekaiser
+      const mordekaiserChampionId = 82; // Mordekaiser champion ID
+
+      // Base skin (Sahn Uzal Mordekaiser base)
+      const baseSkinChroma = {
+        id: baseFormId,
+        name: "Default",
+        imagePath: getLocalPreviewPath(
+          mordekaiserChampionId,
+          baseFormId,
+          baseFormId,
+          true
+        ),
+        colors: [],
+        primaryColor: null,
+        selected: false,
+        locked: false,
+        buttonIconPath: getMordekaiserButtonIconPath(baseFormId),
+      };
+
+      // Forms (IDs 82998, 82999)
+      const formList = forms.map((form) => ({
+        id: form.id,
+        name: form.name,
+        imagePath: getLocalPreviewPath(
+          mordekaiserChampionId,
+          baseFormId,
+          form.id,
+          false
+        ),
+        colors: form.colors || [],
+        primaryColor: null, // Forms don't have colors
+        selected: false,
+        locked: false, // Forms are clickable (locking is just visual in the official client)
+        buttonIconPath: getMordekaiserButtonIconPath(form.id),
+        form_path: form.form_path,
+      }));
+
+      const allChromas = [baseSkinChroma, ...formList];
+      return markSelectedChroma(allChromas, currentSkinId);
+    }
+
+    // SPECIAL CASE: Spirit Blossom Morgana (skin ID 25080) - use local Forms data
+    if (baseSkinId === 25080 || baseSkinId === 25999) {
+      log.debug(
+        `[getChromaData] Spirit Blossom Morgana detected (base skin: 25080) - using local Forms data`
+      );
+      const forms = getMorganaForms();
+      const baseFormId = 25080; // Always use base skin ID for Spirit Blossom Morgana
+      const morganaChampionId = 25; // Morgana champion ID
+
+      // Base skin (Spirit Blossom Morgana base)
+      const baseSkinChroma = {
+        id: baseFormId,
+        name: "Default",
+        imagePath: getLocalPreviewPath(
+          morganaChampionId,
+          baseFormId,
+          baseFormId,
+          true
+        ),
+        colors: [],
+        primaryColor: null,
+        selected: false,
+        locked: false,
+        buttonIconPath: getMorganaButtonIconPath(baseFormId),
+      };
+
+      // Forms (ID 25999)
+      const formList = forms.map((form) => ({
+        id: form.id,
+        name: form.name,
+        imagePath: getLocalPreviewPath(
+          morganaChampionId,
+          baseFormId,
+          form.id,
+          false
+        ),
+        colors: form.colors || [],
+        primaryColor: null, // Forms don't have colors
+        selected: false,
+        locked: false, // Forms are clickable (locking is just visual in the official client)
+        buttonIconPath: getMorganaButtonIconPath(form.id),
         form_path: form.form_path,
       }));
 
@@ -2926,13 +3215,13 @@
       const contents = document.createElement("div");
       contents.className = "contents";
 
-      // Check if this is Elementalist Lux form (has buttonIconPath)
+      // Check if this is Elementalist Lux form or Sahn Uzal Mordekaiser form (has buttonIconPath)
       if (
         chroma.buttonIconPath &&
         chroma.buttonIconPath.startsWith("local-asset://")
       ) {
-        // Elementalist Lux form - use local button icon
-        // Format: local-asset://elementalist_buttons/{form_id}.png
+        // Elementalist Lux form or Sahn Uzal Mordekaiser form - use local button icon
+        // Format: local-asset://elementalist_buttons/{form_id}.png or local-asset://mordekaiser_buttons/{form_id}.png
         const iconPath = chroma.buttonIconPath.replace("local-asset://", "");
 
         // Request button icon from Python via bridge
@@ -3188,7 +3477,7 @@
 
   function updateChromaPreview(chroma, chromaImage) {
     // Update preview image using chroma imagePath
-    // For special skins (Elementalist Lux, HOL chromas), use local preview paths
+    // For special skins (Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, HOL chromas), use local preview paths
     // For regular chromas, use LCU API paths
     const imagePath = chroma.imagePath;
 
@@ -3245,7 +3534,7 @@
 
   function updateChromaButtonColor() {
     // Update the chroma button's content background to match selected chroma
-    // For Elementalist Lux forms: use button icon image
+    // For Elementalist Lux forms, Sahn Uzal Mordekaiser forms, and Spirit Blossom Morgana forms: use button icon image
     // If default chroma (no color), keep the button-chroma.png image
     // If chroma has color, use that color as background
     const buttons = document.querySelectorAll(BUTTON_SELECTOR);
@@ -3258,13 +3547,13 @@
         return;
       }
 
-      // Check if this chroma has a button icon path (Elementalist Lux forms or HOL chromas)
+      // Check if this chroma has a button icon path (Elementalist Lux forms, Sahn Uzal Mordekaiser forms, Spirit Blossom Morgana forms, or HOL chromas)
       if (
         selectedChromaData &&
         selectedChromaData.buttonIconPath &&
         selectedChromaData.buttonIconPath.startsWith("local-asset://")
       ) {
-        // Elementalist Lux form or HOL chroma - always request the icon to ensure it matches the selected chroma
+        // Elementalist Lux form, Sahn Uzal Mordekaiser form, Spirit Blossom Morgana form, or HOL chroma - always request the icon to ensure it matches the selected chroma
         // Track the last applied chroma ID on the button to detect when switching between chromas
         const lastAppliedChromaId = content.getAttribute("data-last-chroma-id");
         const chromaIdChanged =
@@ -3360,11 +3649,20 @@
       }
 
       // Check if this is the default chroma (no color or name is "Default")
-      // BUT: For Elementalist Lux and HOL chromas, even the "Default" button should show its icon, not the generic default
+      // BUT: For Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, and HOL chromas, even the "Default" button should show its icon, not the generic default
       const isElementalistLux =
         selectedChromaData &&
         (selectedChromaData.id === 99007 ||
           (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999));
+      const isMordekaiser =
+        selectedChromaData &&
+        (selectedChromaData.id === 82054 ||
+          selectedChromaData.id === 82998 ||
+          selectedChromaData.id === 82999);
+      const isMorgana =
+        selectedChromaData &&
+        (selectedChromaData.id === 25080 ||
+          selectedChromaData.id === 25999);
       const isHolChroma =
         selectedChromaData &&
         (selectedChromaData.id === 145070 ||
@@ -3375,9 +3673,13 @@
         !selectedChromaData ||
         (selectedChromaData.name === "Default" &&
           !isElementalistLux &&
+          !isMordekaiser &&
+          !isMorgana &&
           !isHolChroma) ||
         (!selectedChromaData.primaryColor &&
           !isElementalistLux &&
+          !isMordekaiser &&
+          !isMorgana &&
           !isHolChroma) ||
         selectedChromaData.id === 0;
 
