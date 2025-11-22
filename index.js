@@ -22,19 +22,19 @@
   const skinChromaCache = new Map(); // skinId -> boolean
   const skinToChampionMap = new Map(); // skinId -> championId
   const pendingChampionRequests = new Map(); // championId -> Promise
-  
+
   // Track selected chroma for button color update (controlled by Python)
   let selectedChromaData = null; // { id, primaryColor, colors, name }
   let pythonChromaState = null; // { selectedChromaId, chromaColor, chromaColors, currentSkinId }
   let championLocked = false; // Track if a champion is locked
-  
+
   // WebSocket bridge for sending chroma selection to Python
   let BRIDGE_PORT = 3000; // Default, will be updated from /port endpoint
   let BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
   let bridgeSocket = null;
   let bridgeReady = false;
   let bridgeQueue = [];
-  
+
   // Load bridge port from /port endpoint
   async function loadBridgePort() {
     try {
@@ -60,7 +60,9 @@
         }
       }
       if (window?.console) {
-        console.warn(`${LOG_PREFIX} Failed to load bridge port, using default (3000)`);
+        console.warn(
+          `${LOG_PREFIX} Failed to load bridge port, using default (3000)`
+        );
       }
       return false;
     } catch (e) {
@@ -88,12 +90,18 @@
       chromaClickAudio.play().catch((err) => {
         // Ignore playback errors (e.g. autoplay restrictions) but log for debugging
         if (window?.console) {
-          console.debug("[ChromaWheel] Failed to play chroma click sound:", err);
+          console.debug(
+            "[ChromaWheel] Failed to play chroma click sound:",
+            err
+          );
         }
       });
     } catch (err) {
       if (window?.console) {
-        console.debug("[ChromaWheel] Error initializing chroma click sound:", err);
+        console.debug(
+          "[ChromaWheel] Error initializing chroma click sound:",
+          err
+        );
       }
     }
   }
@@ -463,7 +471,11 @@
 
   function sendToBridge(payload) {
     const message = JSON.stringify(payload);
-    if (!bridgeSocket || bridgeSocket.readyState === WebSocket.CLOSING || bridgeSocket.readyState === WebSocket.CLOSED) {
+    if (
+      !bridgeSocket ||
+      bridgeSocket.readyState === WebSocket.CLOSING ||
+      bridgeSocket.readyState === WebSocket.CLOSED
+    ) {
       bridgeQueue.push(message);
       setupBridgeSocket();
       return;
@@ -484,7 +496,11 @@
   }
 
   function setupBridgeSocket() {
-    if (bridgeSocket && (bridgeSocket.readyState === WebSocket.OPEN || bridgeSocket.readyState === WebSocket.CONNECTING)) {
+    if (
+      bridgeSocket &&
+      (bridgeSocket.readyState === WebSocket.OPEN ||
+        bridgeSocket.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
@@ -502,29 +518,29 @@
       log.debug(`${LOG_PREFIX} Bridge socket connected`);
     });
 
-            bridgeSocket.addEventListener("message", (event) => {
-              try {
-                const data = JSON.parse(event.data);
-                if (data && data.type === "chroma-state") {
-                  // Handle chroma state update from Python
-                  handleChromaStateUpdate(data);
-                } else if (data && data.type === "local-preview-url") {
-                  // Handle local preview URL from Python
-                  handleLocalPreviewUrl(data);
-                } else if (data && data.type === "local-asset-url") {
-                  // Handle local asset URL from Python
-                  handleLocalAssetUrl(data);
-                } else if (data && data.type === "champion-locked") {
-                  // Handle champion lock state update
-                  handleChampionLocked(data);
-                } else if (data && data.type === "phase-change") {
-                  // Handle phase change (including game mode info from Python)
-                  handlePhaseChangeFromPython(data);
-                }
-              } catch (error) {
-                // Not JSON or invalid - ignore
-              }
-            });
+    bridgeSocket.addEventListener("message", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && data.type === "chroma-state") {
+          // Handle chroma state update from Python
+          handleChromaStateUpdate(data);
+        } else if (data && data.type === "local-preview-url") {
+          // Handle local preview URL from Python
+          handleLocalPreviewUrl(data);
+        } else if (data && data.type === "local-asset-url") {
+          // Handle local asset URL from Python
+          handleLocalAssetUrl(data);
+        } else if (data && data.type === "champion-locked") {
+          // Handle champion lock state update
+          handleChampionLocked(data);
+        } else if (data && data.type === "phase-change") {
+          // Handle phase change (including game mode info from Python)
+          handlePhaseChangeFromPython(data);
+        }
+      } catch (error) {
+        // Not JSON or invalid - ignore
+      }
+    });
 
     bridgeSocket.addEventListener("close", () => {
       bridgeReady = false;
@@ -582,8 +598,10 @@
   function handleLocalPreviewUrl(data) {
     // Handle local preview URL response from Python
     const { championId, skinId, chromaId, url } = data;
-    log.debug(`[ChromaWheel] Received local preview URL: ${url} for chroma ${chromaId}`);
-    
+    log.debug(
+      `[ChromaWheel] Received local preview URL: ${url} for chroma ${chromaId}`
+    );
+
     // Find the chroma image element that requested this preview
     const pending = pendingLocalPreviews.get(chromaId);
     if (pending && pending.chromaImage) {
@@ -597,7 +615,7 @@
       pending.chromaImage.style.display = "";
       log.debug(`[ChromaWheel] Applied local preview URL to chroma image`);
     }
-    
+
     // Clean up pending request
     pendingLocalPreviews.delete(chromaId);
   }
@@ -605,7 +623,9 @@
   function handleLocalAssetUrl(data) {
     // Handle local asset URL response from Python
     const { assetPath, chromaId, url } = data;
-    log.debug(`[ChromaWheel] Received local asset URL: ${url} for chroma ${chromaId}`);
+    log.debug(
+      `[ChromaWheel] Received local asset URL: ${url} for chroma ${chromaId}`
+    );
 
     // Special handling: ARAM background image for the panel
     if (assetPath === ARAM_BACKGROUND_ASSET_PATH && url) {
@@ -614,10 +634,12 @@
 
       if (currentChromaInfoElement) {
         currentChromaInfoElement.style.backgroundImage = `url('${url}')`;
-        log.debug("[ChromaWheel] Applied ARAM background image to chroma panel");
+        log.debug(
+          "[ChromaWheel] Applied ARAM background image to chroma panel"
+        );
       }
     }
-    
+
     // Find the button contents element that requested this asset
     const pending = pendingLocalAssets.get(chromaId);
     if (pending && pending.contents) {
@@ -629,13 +651,15 @@
       pending.contents.style.backgroundPosition = "center";
       pending.contents.style.backgroundRepeat = "no-repeat";
       pending.contents.style.backgroundColor = "";
-      
+
       // Mark that this chroma ID's icon has been applied
       pending.contents.setAttribute("data-last-chroma-id", String(chromaId));
-      
-      log.debug(`[ChromaWheel] Applied local asset URL to button icon for chroma ${chromaId}`);
+
+      log.debug(
+        `[ChromaWheel] Applied local asset URL to button icon for chroma ${chromaId}`
+      );
     }
-    
+
     // Clean up pending request
     pendingLocalAssets.delete(chromaId);
   }
@@ -648,19 +672,21 @@
       chromaColors: data.chromaColors,
       currentSkinId: data.currentSkinId,
     };
-    
-    log.info(`[ChromaWheel] Received chroma state from Python: selectedChromaId=${data.selectedChromaId}, chromaColor=${data.chromaColor}`);
-    
+
+    log.info(
+      `[ChromaWheel] Received chroma state from Python: selectedChromaId=${data.selectedChromaId}, chromaColor=${data.chromaColor}`
+    );
+
     // Check if this is an Elementalist Lux form (ID 99991-99999 or base 99007)
     const isElementalistLux = (id) => {
       return id === 99007 || (id >= 99991 && id <= 99999);
     };
-    
+
     // Check if this is a HOL chroma (Kai'Sa or Ahri)
     const isHolChroma = (id) => {
       return id === 145070 || id === 145071 || id === 103085 || id === 103086;
     };
-    
+
     // Helper to get buttonIconPath for Elementalist Lux forms
     const getButtonIconPathForElementalist = (chromaId) => {
       if (isElementalistLux(chromaId)) {
@@ -668,14 +694,14 @@
       }
       return null;
     };
-    
+
     // Helper to get buttonIconPath for HOL chromas
     const getButtonIconPathForHol = (chromaId) => {
       if (isHolChroma(chromaId)) {
         // Determine base skin ID and champion ID
         let baseSkinId;
         let championId;
-        
+
         if (chromaId === 145070 || chromaId === 145071) {
           // Kai'Sa HOL
           baseSkinId = 145070;
@@ -687,18 +713,21 @@
         } else {
           return null;
         }
-        
+
         return getHolButtonIconPath(championId, chromaId, baseSkinId);
       }
       return null;
     };
-    
+
     // Update selectedChromaData based on Python state
     if (data.selectedChromaId && data.chromaColor) {
       // Python provided the color directly
-      const buttonIconPath = getButtonIconPathForElementalist(data.selectedChromaId) || 
-                            getButtonIconPathForHol(data.selectedChromaId) ||
-                            (selectedChromaData && selectedChromaData.id === data.selectedChromaId ? selectedChromaData.buttonIconPath : null);
+      const buttonIconPath =
+        getButtonIconPathForElementalist(data.selectedChromaId) ||
+        getButtonIconPathForHol(data.selectedChromaId) ||
+        (selectedChromaData && selectedChromaData.id === data.selectedChromaId
+          ? selectedChromaData.buttonIconPath
+          : null);
       selectedChromaData = {
         id: data.selectedChromaId,
         primaryColor: data.chromaColor,
@@ -709,29 +738,34 @@
     } else if (data.selectedChromaId) {
       // Python provided selectedChromaId but no color - try to find it from cache
       let foundChroma = null;
-      
+
       // Get base skin ID - check if currentSkinId is a chroma ID first
       // Also check if baseSkinId was provided in the payload (from selectChroma)
-      let baseSkinId = data.baseSkinId || data.currentSkinId || skinMonitorState?.skinId;
-      
+      let baseSkinId =
+        data.baseSkinId || data.currentSkinId || skinMonitorState?.skinId;
+
       // If currentSkinId is a chroma ID, get the base skin ID from chromaParentMap
       if (baseSkinId && chromaParentMap.has(baseSkinId)) {
         baseSkinId = chromaParentMap.get(baseSkinId);
-        log.debug(`[ChromaWheel] Found base skin ID ${baseSkinId} for chroma ${data.currentSkinId} from chromaParentMap`);
+        log.debug(
+          `[ChromaWheel] Found base skin ID ${baseSkinId} for chroma ${data.currentSkinId} from chromaParentMap`
+        );
       }
-      
+
       // Also check if selectedChromaId itself is in the map (in case currentSkinId wasn't set correctly)
       if (!baseSkinId && chromaParentMap.has(data.selectedChromaId)) {
         baseSkinId = chromaParentMap.get(data.selectedChromaId);
-        log.debug(`[ChromaWheel] Found base skin ID ${baseSkinId} for selected chroma ${data.selectedChromaId} from chromaParentMap`);
+        log.debug(
+          `[ChromaWheel] Found base skin ID ${baseSkinId} for selected chroma ${data.selectedChromaId} from chromaParentMap`
+        );
       }
-      
+
       // Check if this is Elementalist Lux - if so, use local data
       if (isElementalistLux(data.selectedChromaId)) {
         // Elementalist Lux form - get data from local functions
         const baseFormId = 99007;
         const luxChampionId = 99;
-        
+
         // Check if it's the base form or a form
         if (data.selectedChromaId === baseFormId) {
           // Base form
@@ -745,7 +779,7 @@
         } else {
           // Elementalist Lux form (99991-99999)
           const forms = getElementalistForms();
-          const form = forms.find(f => f.id === data.selectedChromaId);
+          const form = forms.find((f) => f.id === data.selectedChromaId);
           if (form) {
             selectedChromaData = {
               id: data.selectedChromaId,
@@ -761,26 +795,36 @@
               primaryColor: null,
               colors: [],
               name: "Selected",
-              buttonIconPath: getElementalistButtonIconPath(data.selectedChromaId),
+              buttonIconPath: getElementalistButtonIconPath(
+                data.selectedChromaId
+              ),
             };
           }
         }
-        log.debug(`[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`);
+        log.debug(
+          `[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
+        );
       } else if (isHolChroma(data.selectedChromaId)) {
         // HOL chroma - get data from local functions
         let baseSkinId;
         let championId;
-        
-        if (data.selectedChromaId === 145070 || data.selectedChromaId === 145071) {
+
+        if (
+          data.selectedChromaId === 145070 ||
+          data.selectedChromaId === 145071
+        ) {
           // Kai'Sa HOL
           baseSkinId = 145070;
           championId = 145;
-        } else if (data.selectedChromaId === 103085 || data.selectedChromaId === 103086) {
+        } else if (
+          data.selectedChromaId === 103085 ||
+          data.selectedChromaId === 103086
+        ) {
           // Ahri HOL
           baseSkinId = 103085;
           championId = 103;
         }
-        
+
         // Check if it's the base skin or HOL chroma
         if (data.selectedChromaId === baseSkinId) {
           // Base skin
@@ -789,19 +833,30 @@
             primaryColor: null,
             colors: [],
             name: "Default",
-            buttonIconPath: getHolButtonIconPath(championId, baseSkinId, baseSkinId),
+            buttonIconPath: getHolButtonIconPath(
+              championId,
+              baseSkinId,
+              baseSkinId
+            ),
           };
         } else {
           // HOL chroma
-          const holChromas = championId === 145 ? getKaisaHolChromas() : getAhriHolChromas();
-          const holChroma = holChromas.find(c => c.id === data.selectedChromaId);
+          const holChromas =
+            championId === 145 ? getKaisaHolChromas() : getAhriHolChromas();
+          const holChroma = holChromas.find(
+            (c) => c.id === data.selectedChromaId
+          );
           if (holChroma) {
             selectedChromaData = {
               id: data.selectedChromaId,
               primaryColor: null,
               colors: [],
               name: holChroma.name || "Selected",
-              buttonIconPath: getHolButtonIconPath(championId, data.selectedChromaId, baseSkinId),
+              buttonIconPath: getHolButtonIconPath(
+                championId,
+                data.selectedChromaId,
+                baseSkinId
+              ),
             };
           } else {
             // HOL chroma not found - use button icon path anyway
@@ -810,11 +865,17 @@
               primaryColor: null,
               colors: [],
               name: "Selected",
-              buttonIconPath: getHolButtonIconPath(championId, data.selectedChromaId, baseSkinId),
+              buttonIconPath: getHolButtonIconPath(
+                championId,
+                data.selectedChromaId,
+                baseSkinId
+              ),
             };
           }
         }
-        log.debug(`[ChromaWheel] HOL chroma detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`);
+        log.debug(
+          `[ChromaWheel] HOL chroma detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
+        );
       } else {
         // Regular chroma - try to find from cache
         // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
@@ -827,17 +888,27 @@
             baseSkinId = chromaParentMap.get(baseSkinId);
           }
         }
-        
+
         if (baseSkinId) {
           const cachedChromas = getCachedChromasForSkin(baseSkinId);
-          foundChroma = cachedChromas.find(c => c.id === data.selectedChromaId);
-          log.debug(`[ChromaWheel] Looking for chroma ${data.selectedChromaId} in base skin ${baseSkinId}, found: ${foundChroma ? 'yes' : 'no'}`);
+          foundChroma = cachedChromas.find(
+            (c) => c.id === data.selectedChromaId
+          );
+          log.debug(
+            `[ChromaWheel] Looking for chroma ${
+              data.selectedChromaId
+            } in base skin ${baseSkinId}, found: ${foundChroma ? "yes" : "no"}`
+          );
         }
-        
+
         if (foundChroma && foundChroma.primaryColor) {
           // Preserve buttonIconPath if it exists in foundChroma or in existing selectedChromaData
-          const buttonIconPath = foundChroma.buttonIconPath || 
-                               (selectedChromaData && selectedChromaData.id === data.selectedChromaId ? selectedChromaData.buttonIconPath : null);
+          const buttonIconPath =
+            foundChroma.buttonIconPath ||
+            (selectedChromaData &&
+            selectedChromaData.id === data.selectedChromaId
+              ? selectedChromaData.buttonIconPath
+              : null);
           selectedChromaData = {
             id: data.selectedChromaId,
             primaryColor: foundChroma.primaryColor,
@@ -845,11 +916,18 @@
             name: foundChroma.name || "Selected",
             buttonIconPath: buttonIconPath,
           };
-          log.debug(`[ChromaWheel] Found chroma color from cache: ${foundChroma.primaryColor}`);
+          log.debug(
+            `[ChromaWheel] Found chroma color from cache: ${foundChroma.primaryColor}`
+          );
         } else {
           // Chroma selected but no color available - try to keep existing selectedChromaData if it matches
-          if (selectedChromaData && selectedChromaData.id === data.selectedChromaId) {
-            log.debug(`[ChromaWheel] Keeping existing selectedChromaData for chroma ${data.selectedChromaId}`);
+          if (
+            selectedChromaData &&
+            selectedChromaData.id === data.selectedChromaId
+          ) {
+            log.debug(
+              `[ChromaWheel] Keeping existing selectedChromaData for chroma ${data.selectedChromaId}`
+            );
             // Keep the existing data, just update the ID to be sure
             selectedChromaData.id = data.selectedChromaId;
             // Preserve buttonIconPath if it exists
@@ -865,7 +943,9 @@
               name: "Default",
               buttonIconPath: null,
             };
-            log.debug(`[ChromaWheel] Could not find chroma color for ${data.selectedChromaId}, using default`);
+            log.debug(
+              `[ChromaWheel] Could not find chroma color for ${data.selectedChromaId}, using default`
+            );
           }
         }
       }
@@ -879,20 +959,27 @@
         // Determine base skin ID and champion ID for HOL
         let baseSkinId;
         let championId;
-        
+
         if (data.currentSkinId === 145070 || data.currentSkinId === 145071) {
           baseSkinId = 145070;
           championId = 145;
-        } else if (data.currentSkinId === 103085 || data.currentSkinId === 103086) {
+        } else if (
+          data.currentSkinId === 103085 ||
+          data.currentSkinId === 103086
+        ) {
           baseSkinId = 103085;
           championId = 103;
         }
-        
+
         if (baseSkinId && championId) {
-          buttonIconPath = getHolButtonIconPath(championId, data.currentSkinId, baseSkinId);
+          buttonIconPath = getHolButtonIconPath(
+            championId,
+            data.currentSkinId,
+            baseSkinId
+          );
         }
       }
-      
+
       selectedChromaData = {
         id: data.currentSkinId || null,
         primaryColor: null,
@@ -901,7 +988,7 @@
         buttonIconPath: buttonIconPath,
       };
     }
-    
+
     // Update button color
     updateChromaButtonColor();
   }
@@ -916,8 +1003,7 @@
       if (phase === "ChampSelect" || phase === "FINALIZATION") {
         const isAram =
           mapId === 12 ||
-          (typeof gameMode === "string" &&
-            gameMode.toUpperCase() === "ARAM");
+          (typeof gameMode === "string" && gameMode.toUpperCase() === "ARAM");
 
         isAramFromPython = Boolean(isAram);
       } else {
@@ -943,17 +1029,23 @@
       timestamp: Date.now(),
     };
 
-    log.debug(
-      "[ChromaWheel] Requesting ARAM background image from Python",
-      { assetPath: ARAM_BACKGROUND_ASSET_PATH }
-    );
+    log.debug("[ChromaWheel] Requesting ARAM background image from Python", {
+      assetPath: ARAM_BACKGROUND_ASSET_PATH,
+    });
 
-    if (bridgeReady && bridgeSocket && bridgeSocket.readyState === WebSocket.OPEN) {
+    if (
+      bridgeReady &&
+      bridgeSocket &&
+      bridgeSocket.readyState === WebSocket.OPEN
+    ) {
       try {
         bridgeSocket.send(JSON.stringify(payload));
       } catch (e) {
         aramBackgroundRequestPending = false;
-        log.debug("[ChromaWheel] Failed to send ARAM background request, queuing", e);
+        log.debug(
+          "[ChromaWheel] Failed to send ARAM background request, queuing",
+          e
+        );
         bridgeQueue.push(JSON.stringify(payload));
       }
     } else {
@@ -1075,35 +1167,86 @@
   // Get Elementalist Lux Forms data locally (same as Python's _get_elementalist_forms)
   function getElementalistForms() {
     const forms = [
-      { id: 99991, name: 'Air', colors: [], form_path: 'Lux/Forms/Lux Elementalist Air.zip' },
-      { id: 99992, name: 'Dark', colors: [], form_path: 'Lux/Forms/Lux Elementalist Dark.zip' },
-      { id: 99993, name: 'Ice', colors: [], form_path: 'Lux/Forms/Lux Elementalist Ice.zip' },
-      { id: 99994, name: 'Magma', colors: [], form_path: 'Lux/Forms/Lux Elementalist Magma.zip' },
-      { id: 99995, name: 'Mystic', colors: [], form_path: 'Lux/Forms/Lux Elementalist Mystic.zip' },
-      { id: 99996, name: 'Nature', colors: [], form_path: 'Lux/Forms/Lux Elementalist Nature.zip' },
-      { id: 99997, name: 'Storm', colors: [], form_path: 'Lux/Forms/Lux Elementalist Storm.zip' },
-      { id: 99998, name: 'Water', colors: [], form_path: 'Lux/Forms/Lux Elementalist Water.zip' },
-      { id: 99999, name: 'Fire', colors: [], form_path: 'Lux/Forms/Elementalist Lux Fire.zip' },
+      {
+        id: 99991,
+        name: "Air",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Air.zip",
+      },
+      {
+        id: 99992,
+        name: "Dark",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Dark.zip",
+      },
+      {
+        id: 99993,
+        name: "Ice",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Ice.zip",
+      },
+      {
+        id: 99994,
+        name: "Magma",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Magma.zip",
+      },
+      {
+        id: 99995,
+        name: "Mystic",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Mystic.zip",
+      },
+      {
+        id: 99996,
+        name: "Nature",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Nature.zip",
+      },
+      {
+        id: 99997,
+        name: "Storm",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Storm.zip",
+      },
+      {
+        id: 99998,
+        name: "Water",
+        colors: [],
+        form_path: "Lux/Forms/Lux Elementalist Water.zip",
+      },
+      {
+        id: 99999,
+        name: "Fire",
+        colors: [],
+        form_path: "Lux/Forms/Elementalist Lux Fire.zip",
+      },
     ];
-    log.debug(`[getElementalistForms] Created ${forms.length} Elementalist Lux Forms with fake IDs (99991-99999)`);
+    log.debug(
+      `[getElementalistForms] Created ${forms.length} Elementalist Lux Forms with fake IDs (99991-99999)`
+    );
     return forms;
   }
 
   // Get Risen Legend Kai'Sa HOL chroma data locally (same as Python's _get_hol_chromas)
   function getKaisaHolChromas() {
     const chromas = [
-      { id: 145071, skinId: 145070, name: 'Immortalized Legend', colors: [] },
+      { id: 145071, skinId: 145070, name: "Immortalized Legend", colors: [] },
     ];
-    log.debug(`[getKaisaHolChromas] Created ${chromas.length} Risen Legend Kai'Sa HOL chromas with real skin ID (145071)`);
+    log.debug(
+      `[getKaisaHolChromas] Created ${chromas.length} Risen Legend Kai'Sa HOL chromas with real skin ID (145071)`
+    );
     return chromas;
   }
 
   // Get Risen Legend Ahri HOL chroma data locally (same as Python's _get_ahri_hol_chromas)
   function getAhriHolChromas() {
     const chromas = [
-      { id: 103086, skinId: 103085, name: 'Immortalized Legend', colors: [] },
+      { id: 103086, skinId: 103085, name: "Immortalized Legend", colors: [] },
     ];
-    log.debug(`[getAhriHolChromas] Created ${chromas.length} Risen Legend Ahri HOL chromas with real skin ID (103086)`);
+    log.debug(
+      `[getAhriHolChromas] Created ${chromas.length} Risen Legend Ahri HOL chromas with real skin ID (103086)`
+    );
     return chromas;
   }
 
@@ -1114,7 +1257,7 @@
     if (!Number.isFinite(championId) || !Number.isFinite(skinId)) {
       return null;
     }
-    
+
     // Request preview path from Python via bridge
     // Python will return the local file path or serve it via HTTP
     // For now, construct the expected path structure
@@ -1141,7 +1284,7 @@
     // HOL chromas (145071, 103086) use "immortal.png"
     let imageName;
     let folderName;
-    
+
     if (chromaId === baseSkinId) {
       // Base skin - use "risen.png"
       imageName = "risen.png";
@@ -1151,7 +1294,7 @@
       imageName = "immortal.png";
       folderName = championId === 145 ? "kaisa_buttons" : "ahri_buttons";
     }
-    
+
     const path = `local-asset://${folderName}/${imageName}`;
     return path;
   }
@@ -1237,35 +1380,45 @@
 
     const championId = skinToChampionMap.get(numericId);
     if (!Number.isFinite(championId)) {
-      log.debug(`[getCachedChromasForSkin] No champion ID found for skin ${numericId}`);
+      log.debug(
+        `[getCachedChromasForSkin] No champion ID found for skin ${numericId}`
+      );
       return [];
     }
 
     const championCache = championSkinCache.get(championId);
     if (!championCache) {
-      log.debug(`[getCachedChromasForSkin] No champion cache found for champion ${championId}`);
+      log.debug(
+        `[getCachedChromasForSkin] No champion cache found for champion ${championId}`
+      );
       return [];
     }
 
     const entry = championCache.get(numericId);
     if (!entry || !Array.isArray(entry.chromas)) {
-      log.debug(`[getCachedChromasForSkin] No chromas entry found for skin ${numericId} in champion ${championId} cache`);
+      log.debug(
+        `[getCachedChromasForSkin] No chromas entry found for skin ${numericId} in champion ${championId} cache`
+      );
       return [];
     }
 
-    log.debug(`[getCachedChromasForSkin] Found ${entry.chromas.length} chromas for skin ${numericId}`);
-    
+    log.debug(
+      `[getCachedChromasForSkin] Found ${entry.chromas.length} chromas for skin ${numericId}`
+    );
+
     // Ensure chromaParentMap is populated for these chromas
     entry.chromas.forEach((chroma) => {
       if (chroma.id && Number.isFinite(chroma.id) && chroma.id !== numericId) {
         // Only map if it's not the base skin itself
         if (!chromaParentMap.has(chroma.id)) {
           chromaParentMap.set(chroma.id, numericId);
-          log.debug(`[getCachedChromasForSkin] Registered chroma ${chroma.id} -> base skin ${numericId} in chromaParentMap`);
+          log.debug(
+            `[getCachedChromasForSkin] Registered chroma ${chroma.id} -> base skin ${numericId} in chromaParentMap`
+          );
         }
       }
     });
-    
+
     return entry.chromas.map((chroma) => ({ ...chroma }));
   }
 
@@ -1328,7 +1481,8 @@
         // Extract colors from chroma data
         const colors = Array.isArray(chroma?.colors) ? chroma.colors : [];
         // Use the second color if available (typically the main chroma color), otherwise first color
-        const primaryColor = colors.length > 1 ? colors[1] : (colors.length > 0 ? colors[0] : null);
+        const primaryColor =
+          colors.length > 1 ? colors[1] : colors.length > 0 ? colors[0] : null;
         return {
           id: chromaId,
           name: chroma?.name || chroma?.shortName || `Chroma ${index}`,
@@ -1494,10 +1648,14 @@
         log.info(`[ChromaWheel] Skin offset: ${offset}`);
 
         if (offset === 2) {
-          log.info("[ChromaWheel] Found skin item with offset 2, opening panel");
+          log.info(
+            "[ChromaWheel] Found skin item with offset 2, opening panel"
+          );
           toggleChromaPanel(button, skinItem);
         } else {
-          log.info(`[ChromaWheel] Skin offset is ${offset}, not 2. Panel will not open.`);
+          log.info(
+            `[ChromaWheel] Skin offset is ${offset}, not 2. Panel will not open.`
+          );
         }
       } else {
         log.warn("[ChromaWheel] Could not find skin item for chroma button");
@@ -1533,9 +1691,7 @@
       if (window.Ember.getOwner) {
         const application = window.Ember.getOwner(championSelectEl);
         if (application) {
-          const rootComponent = application.lookup(
-            "component:champion-select"
-          );
+          const rootComponent = application.lookup("component:champion-select");
           if (rootComponent) {
             const gameMode = rootComponent.get("gameMode");
             if (gameMode) {
@@ -1650,11 +1806,11 @@
 
   function updateButtonVisibility(button, hasChromas) {
     if (!button) return;
-    
+
     const shouldShow = Boolean(hasChromas);
     const lastState = button._luLastVisibilityState;
     const willChange = lastState === undefined || lastState !== shouldShow;
-    
+
     // Only log when visibility actually changes
     if (willChange) {
       emitBridgeLog("button_visibility_update", {
@@ -1664,7 +1820,7 @@
       });
       button._luLastVisibilityState = shouldShow;
     }
-    
+
     if (shouldShow) {
       button.style.display = "block";
       button.style.visibility = "visible";
@@ -1674,7 +1830,7 @@
       button.removeAttribute("data-hidden");
       // Re-enable pointer events on all children
       const children = button.querySelectorAll("*");
-      children.forEach(child => {
+      children.forEach((child) => {
         child.style.pointerEvents = "";
         child.style.cursor = "";
         child.style.visibility = "";
@@ -1686,19 +1842,21 @@
       button.style.opacity = "0";
       button.style.cursor = "default";
       button.setAttribute("data-hidden", "true");
-      
+
       // Disable pointer events on all children to prevent any hover effects
       const children = button.querySelectorAll("*");
-      children.forEach(child => {
+      children.forEach((child) => {
         child.style.pointerEvents = "none";
         child.style.cursor = "default";
         child.style.visibility = "hidden";
       });
-      
+
       // Close and disable any open panel when button becomes hidden
       const existingPanel = document.getElementById(PANEL_ID);
       if (existingPanel) {
-        log.info("[ChromaWheel] Button hidden, closing panel and marking as non-interactive");
+        log.info(
+          "[ChromaWheel] Button hidden, closing panel and marking as non-interactive"
+        );
         existingPanel.setAttribute("data-no-button", "true");
         existingPanel.style.pointerEvents = "none";
         existingPanel.style.cursor = "default";
@@ -1754,14 +1912,18 @@
   function handleChampionLocked(data) {
     const wasLocked = championLocked;
     championLocked = data.locked === true;
-    
-    log.debug(`[ChromaWheel] Champion lock state updated: ${championLocked} (was: ${wasLocked})`);
-    
+
+    log.debug(
+      `[ChromaWheel] Champion lock state updated: ${championLocked} (was: ${wasLocked})`
+    );
+
     // If champion was unlocked, remove all buttons
     if (!championLocked && wasLocked) {
-      log.debug("[ChromaWheel] Champion unlocked - removing all chroma buttons");
+      log.debug(
+        "[ChromaWheel] Champion unlocked - removing all chroma buttons"
+      );
       const allButtons = document.querySelectorAll(BUTTON_SELECTOR);
-      allButtons.forEach(button => button.remove());
+      allButtons.forEach((button) => button.remove());
     } else if (championLocked && !wasLocked) {
       // Champion just locked - scan for buttons
       log.debug("[ChromaWheel] Champion locked - scanning for chroma buttons");
@@ -1803,7 +1965,11 @@
     // Only log current skin eval when skin actually changes
     const lastEval = ensureFakeButton._lastEval;
     const currentSkinId = skinMonitorState?.skinId ?? null;
-    if (!lastEval || lastEval.skinId !== currentSkinId || lastEval.hasChromas !== hasChromas) {
+    if (
+      !lastEval ||
+      lastEval.skinId !== currentSkinId ||
+      lastEval.hasChromas !== hasChromas
+    ) {
       emitBridgeLog("current_skin_eval", {
         stateSkinId: currentSkinId,
         hasChromas,
@@ -1834,7 +2000,7 @@
   function scanSkinSelection() {
     const skinItems = document.querySelectorAll(".skin-selection-item");
     const thumbnailWrappers = document.querySelectorAll(".thumbnail-wrapper");
-    
+
     // Only log when state actually changes
     const prevState = scanSkinSelection._lastState;
     const currentState = {
@@ -1842,16 +2008,18 @@
       currentSkinId: skinMonitorState?.skinId,
       hasChromas: skinMonitorState?.hasChromas,
     };
-    if (!prevState || 
-        prevState.currentSkinId !== currentState.currentSkinId ||
-        prevState.hasChromas !== currentState.hasChromas) {
+    if (
+      !prevState ||
+      prevState.currentSkinId !== currentState.currentSkinId ||
+      prevState.hasChromas !== currentState.hasChromas
+    ) {
       emitBridgeLog("scan_skin_selection", {
         ...currentState,
         thumbnailWrappersCount: thumbnailWrappers.length,
       });
       scanSkinSelection._lastState = currentState;
     }
-    
+
     skinItems.forEach((skinItem) => {
       ensureFakeButton(skinItem);
     });
@@ -1968,7 +2136,11 @@
             // Try to get chromas from the skin object directly (like official client does)
             // The official client has chromas in the skin object from Ember context
             if (skin.chromas || skin.childSkins) {
-              log.debug(`[getSkinData] Found chromas in Ember context: ${(skin.chromas || skin.childSkins)?.length || 0} chromas`);
+              log.debug(
+                `[getSkinData] Found chromas in Ember context: ${
+                  (skin.chromas || skin.childSkins)?.length || 0
+                } chromas`
+              );
             }
             return skin;
           }
@@ -2014,40 +2186,54 @@
     if (!chromas || chromas.length === 0) {
       return chromas;
     }
-    
+
     // Reset all selections
-    chromas.forEach(c => c.selected = false);
-    
+    chromas.forEach((c) => (c.selected = false));
+
     // Use Python's selected chroma ID if available and not null
     // Only use currentSkinId as fallback if Python state doesn't exist or selectedChromaId is null
     let selectedChromaId = null;
-    if (pythonChromaState && pythonChromaState.selectedChromaId !== null && pythonChromaState.selectedChromaId !== undefined) {
+    if (
+      pythonChromaState &&
+      pythonChromaState.selectedChromaId !== null &&
+      pythonChromaState.selectedChromaId !== undefined
+    ) {
       selectedChromaId = pythonChromaState.selectedChromaId;
-      log.debug(`[getChromaData] Using Python's selected chroma ID: ${selectedChromaId}`);
+      log.debug(
+        `[getChromaData] Using Python's selected chroma ID: ${selectedChromaId}`
+      );
     } else {
       // Python state not available or no chroma selected - use current skin ID (base skin)
       selectedChromaId = currentSkinId;
-      log.debug(`[getChromaData] Using current skin ID as fallback: ${selectedChromaId}`);
+      log.debug(
+        `[getChromaData] Using current skin ID as fallback: ${selectedChromaId}`
+      );
     }
-    
+
     // Find chroma matching the selected chroma ID
-    const matchingChroma = chromas.find(c => c.id === selectedChromaId);
+    const matchingChroma = chromas.find((c) => c.id === selectedChromaId);
     if (matchingChroma) {
       matchingChroma.selected = true;
-      log.debug(`[getChromaData] Marked chroma ${matchingChroma.id} as selected (ID: ${selectedChromaId})`);
+      log.debug(
+        `[getChromaData] Marked chroma ${matchingChroma.id} as selected (ID: ${selectedChromaId})`
+      );
     } else {
       // Default to base skin (first chroma with name "Default")
-      const defaultChroma = chromas.find(c => c.name === "Default");
+      const defaultChroma = chromas.find((c) => c.name === "Default");
       if (defaultChroma) {
         defaultChroma.selected = true;
-        log.debug(`[getChromaData] Marked default chroma ${defaultChroma.id} as selected (no match for ID ${selectedChromaId})`);
+        log.debug(
+          `[getChromaData] Marked default chroma ${defaultChroma.id} as selected (no match for ID ${selectedChromaId})`
+        );
       } else if (chromas.length > 0) {
         // Fallback to first chroma
         chromas[0].selected = true;
-        log.debug(`[getChromaData] Marked first chroma ${chromas[0].id} as selected (fallback)`);
+        log.debug(
+          `[getChromaData] Marked first chroma ${chromas[0].id} as selected (fallback)`
+        );
       }
     }
-    
+
     return chromas;
   }
 
@@ -2055,44 +2241,59 @@
     if (!skinData) {
       return [];
     }
-    
+
     // Get current skin ID from state to determine which chroma should be selected
     // Prioritize Python's selected chroma ID if available, otherwise use skinMonitorState
     // This ensures we show the correct selected chroma even if skinMonitorState has the base skin ID
-    const currentSkinId = pythonChromaState?.selectedChromaId !== null && pythonChromaState?.selectedChromaId !== undefined
-      ? pythonChromaState.selectedChromaId
-      : (skinMonitorState?.skinId || null);
+    const currentSkinId =
+      pythonChromaState?.selectedChromaId !== null &&
+      pythonChromaState?.selectedChromaId !== undefined
+        ? pythonChromaState.selectedChromaId
+        : skinMonitorState?.skinId || null;
 
     const baseSkinId = extractSkinIdFromData(skinData);
-    const resolvedChampionId = getChampionIdFromContext(skinData, baseSkinId, null) || 
-                      skinData.championId || 
-                      (Number.isFinite(baseSkinId) ? Math.floor(baseSkinId / 1000) : null);
+    const resolvedChampionId =
+      getChampionIdFromContext(skinData, baseSkinId, null) ||
+      skinData.championId ||
+      (Number.isFinite(baseSkinId) ? Math.floor(baseSkinId / 1000) : null);
 
     // SPECIAL CASE: Check for special skins FIRST (before LCU API data)
     // Elementalist Lux (skin ID 99007) - use local Forms data
     if (baseSkinId === 99007 || (99991 <= baseSkinId && baseSkinId <= 99999)) {
-      log.debug(`[getChromaData] Elementalist Lux detected (base skin: 99007) - using local Forms data`);
+      log.debug(
+        `[getChromaData] Elementalist Lux detected (base skin: 99007) - using local Forms data`
+      );
       const forms = getElementalistForms();
       const baseFormId = 99007; // Always use base skin ID for Elementalist Lux
       const luxChampionId = 99; // Lux champion ID
-      
+
       // Base skin (Elementalist Lux base)
       const baseSkinChroma = {
         id: baseFormId,
         name: "Default",
-        imagePath: getLocalPreviewPath(luxChampionId, baseFormId, baseFormId, true),
+        imagePath: getLocalPreviewPath(
+          luxChampionId,
+          baseFormId,
+          baseFormId,
+          true
+        ),
         colors: [],
         primaryColor: null,
         selected: false,
         locked: false,
         buttonIconPath: getElementalistButtonIconPath(baseFormId),
       };
-      
+
       // Forms (fake IDs 99991-99999)
       const formList = forms.map((form) => ({
         id: form.id,
         name: form.name,
-        imagePath: getLocalPreviewPath(luxChampionId, baseFormId, form.id, false),
+        imagePath: getLocalPreviewPath(
+          luxChampionId,
+          baseFormId,
+          form.id,
+          false
+        ),
         colors: form.colors || [],
         primaryColor: null, // Forms don't have colors
         selected: false,
@@ -2100,77 +2301,117 @@
         buttonIconPath: getElementalistButtonIconPath(form.id),
         form_path: form.form_path,
       }));
-      
+
       const allChromas = [baseSkinChroma, ...formList];
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
     // SPECIAL CASE: Risen Legend Kai'Sa (skin ID 145070) or Immortalized Legend (145071)
     if (baseSkinId === 145070 || baseSkinId === 145071) {
-      log.debug(`[getChromaData] Risen Legend Kai'Sa detected (base skin: 145070) - using local HOL chroma data`);
+      log.debug(
+        `[getChromaData] Risen Legend Kai'Sa detected (base skin: 145070) - using local HOL chroma data`
+      );
       const holChromas = getKaisaHolChromas();
       const actualBaseSkinId = 145070; // Always use base skin ID
       const kaisaChampionId = 145; // Kai'Sa champion ID
-      
+
       // Base skin (Risen Legend Kai'Sa)
       const baseSkinChroma = {
         id: actualBaseSkinId,
         name: "Default",
-        imagePath: getLocalPreviewPath(kaisaChampionId, actualBaseSkinId, actualBaseSkinId, true),
+        imagePath: getLocalPreviewPath(
+          kaisaChampionId,
+          actualBaseSkinId,
+          actualBaseSkinId,
+          true
+        ),
         colors: [],
         primaryColor: null,
         selected: false,
         locked: false,
-        buttonIconPath: getHolButtonIconPath(kaisaChampionId, actualBaseSkinId, actualBaseSkinId),
+        buttonIconPath: getHolButtonIconPath(
+          kaisaChampionId,
+          actualBaseSkinId,
+          actualBaseSkinId
+        ),
       };
-      
+
       // HOL chroma (Immortalized Legend)
       const holChromaList = holChromas.map((chroma) => ({
         id: chroma.id,
         name: chroma.name,
-        imagePath: getLocalPreviewPath(kaisaChampionId, actualBaseSkinId, chroma.id, false),
+        imagePath: getLocalPreviewPath(
+          kaisaChampionId,
+          actualBaseSkinId,
+          chroma.id,
+          false
+        ),
         colors: chroma.colors || [],
         primaryColor: null,
         selected: false,
         locked: false, // HOL chromas are clickable
-        buttonIconPath: getHolButtonIconPath(kaisaChampionId, chroma.id, actualBaseSkinId),
+        buttonIconPath: getHolButtonIconPath(
+          kaisaChampionId,
+          chroma.id,
+          actualBaseSkinId
+        ),
       }));
-      
+
       const allChromas = [baseSkinChroma, ...holChromaList];
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
     // SPECIAL CASE: Risen Legend Ahri (skin ID 103085) or Immortalized Legend (103086)
     if (baseSkinId === 103085 || baseSkinId === 103086) {
-      log.debug(`[getChromaData] Risen Legend Ahri detected (base skin: 103085) - using local HOL chroma data`);
+      log.debug(
+        `[getChromaData] Risen Legend Ahri detected (base skin: 103085) - using local HOL chroma data`
+      );
       const holChromas = getAhriHolChromas();
       const actualBaseSkinId = 103085; // Always use base skin ID
       const ahriChampionId = 103; // Ahri champion ID
-      
+
       // Base skin (Risen Legend Ahri)
       const baseSkinChroma = {
         id: actualBaseSkinId,
         name: "Default",
-        imagePath: getLocalPreviewPath(ahriChampionId, actualBaseSkinId, actualBaseSkinId, true),
+        imagePath: getLocalPreviewPath(
+          ahriChampionId,
+          actualBaseSkinId,
+          actualBaseSkinId,
+          true
+        ),
         colors: [],
         primaryColor: null,
         selected: false,
         locked: false,
-        buttonIconPath: getHolButtonIconPath(ahriChampionId, actualBaseSkinId, actualBaseSkinId),
+        buttonIconPath: getHolButtonIconPath(
+          ahriChampionId,
+          actualBaseSkinId,
+          actualBaseSkinId
+        ),
       };
-      
+
       // HOL chroma (Immortalized Legend)
       const holChromaList = holChromas.map((chroma) => ({
         id: chroma.id,
         name: chroma.name,
-        imagePath: getLocalPreviewPath(ahriChampionId, actualBaseSkinId, chroma.id, false),
+        imagePath: getLocalPreviewPath(
+          ahriChampionId,
+          actualBaseSkinId,
+          chroma.id,
+          false
+        ),
         colors: chroma.colors || [],
         primaryColor: null,
         selected: false,
         locked: false, // HOL chromas are clickable
-        buttonIconPath: getHolButtonIconPath(ahriChampionId, chroma.id, actualBaseSkinId),
+        buttonIconPath: getHolButtonIconPath(
+          ahriChampionId,
+          chroma.id,
+          actualBaseSkinId
+        ),
       }));
-      
+
       const allChromas = [baseSkinChroma, ...holChromaList];
       return markSelectedChroma(allChromas, currentSkinId);
     }
@@ -2178,16 +2419,19 @@
     // First, check if chromas are directly in the skinData (like official client)
     // The official client gets chromas from the Ember component context
     if (Array.isArray(skinData.chromas) && skinData.chromas.length > 0) {
-      log.debug(`[getChromaData] Found ${skinData.chromas.length} chromas directly in skinData (official client method)`);
+      log.debug(
+        `[getChromaData] Found ${skinData.chromas.length} chromas directly in skinData (official client method)`
+      );
       const baseSkinId = extractSkinIdFromData(skinData);
       const championId = getChampionIdFromContext(skinData, baseSkinId, null);
-      
+
       // Include the base skin as the first option (default)
       // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
-      const defaultImagePath = championId && baseSkinId
-        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
-        : null;
-      
+      const defaultImagePath =
+        championId && baseSkinId
+          ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+          : null;
+
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
@@ -2197,17 +2441,24 @@
         selected: false, // Will be set by markSelectedChroma
         locked: false,
       };
-      
+
       const chromaList = skinData.chromas.map((chroma, index) => {
-        const chromaId = extractSkinIdFromData(chroma) ?? chroma.id ?? chroma.skinId ?? index;
+        const chromaId =
+          extractSkinIdFromData(chroma) ?? chroma.id ?? chroma.skinId ?? index;
         // Extract colors from chroma data
         const colors = Array.isArray(chroma?.colors) ? chroma.colors : [];
         // Use the second color if available (typically the main chroma color), otherwise first color
-        const primaryColor = colors.length > 1 ? colors[1] : (colors.length > 0 ? colors[0] : null);
+        const primaryColor =
+          colors.length > 1 ? colors[1] : colors.length > 0 ? colors[0] : null;
         return {
           id: chromaId,
-          name: chroma.name || chroma.shortName || chroma.chromaName || `Chroma ${index}`,
-          imagePath: chroma.chromaPreviewPath || chroma.imagePath || chroma.chromaPath,
+          name:
+            chroma.name ||
+            chroma.shortName ||
+            chroma.chromaName ||
+            `Chroma ${index}`,
+          imagePath:
+            chroma.chromaPreviewPath || chroma.imagePath || chroma.chromaPath,
           colors: colors,
           primaryColor: primaryColor,
           selected: false, // Will be set by markSelectedChroma
@@ -2215,24 +2466,27 @@
           purchaseDisabled: chroma.purchaseDisabled,
         };
       });
-      
+
       const allChromas = [baseSkinChroma, ...chromaList];
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
     const childSkins = getChildSkinsFromData(skinData);
     if (childSkins.length > 0) {
-      log.debug(`[getChromaData] Found ${childSkins.length} child skins in skinData`);
+      log.debug(
+        `[getChromaData] Found ${childSkins.length} child skins in skinData`
+      );
       const baseSkinId = extractSkinIdFromData(skinData);
       const championId = getChampionIdFromContext(skinData, baseSkinId, null);
       registerChromaChildren(baseSkinId, childSkins);
-      
+
       // Include the base skin as the first option (default)
       // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
-      const defaultImagePath = championId && baseSkinId
-        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
-        : null;
-      
+      const defaultImagePath =
+        championId && baseSkinId
+          ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+          : null;
+
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
@@ -2242,14 +2496,15 @@
         selected: false, // Will be set by markSelectedChroma
         locked: false,
       };
-      
+
       const chromaList = childSkins.map((chroma, index) => {
         const chromaId =
           extractSkinIdFromData(chroma) ?? chroma.id ?? chroma.skinId ?? index;
         // Extract colors from chroma data
         const colors = Array.isArray(chroma?.colors) ? chroma.colors : [];
         // Use the second color if available (typically the main chroma color), otherwise first color
-        const primaryColor = colors.length > 1 ? colors[1] : (colors.length > 0 ? colors[0] : null);
+        const primaryColor =
+          colors.length > 1 ? colors[1] : colors.length > 0 ? colors[0] : null;
         return {
           id: chromaId,
           name: chroma.name || chroma.shortName || `Chroma ${index}`,
@@ -2261,23 +2516,28 @@
           purchaseDisabled: chroma.purchaseDisabled,
         };
       });
-      
+
       const allChromas = [baseSkinChroma, ...chromaList];
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
-    log.debug(`[getChromaData] Checking cached chromas for base skin ${baseSkinId}`);
+    log.debug(
+      `[getChromaData] Checking cached chromas for base skin ${baseSkinId}`
+    );
     const cachedChromas = getCachedChromasForSkin(baseSkinId);
     if (cachedChromas.length > 0) {
-      log.debug(`[getChromaData] Found ${cachedChromas.length} cached chromas for skin ${baseSkinId}`);
+      log.debug(
+        `[getChromaData] Found ${cachedChromas.length} cached chromas for skin ${baseSkinId}`
+      );
       const championId = getChampionIdFromContext(skinData, baseSkinId, null);
-      
+
       // Include the base skin as the first option (default)
       // Construct image path for default chroma: /lol-game-data/assets/v1/champion-chroma-images/{championId}/{skinId}.png
-      const defaultImagePath = championId && baseSkinId
-        ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
-        : null;
-      
+      const defaultImagePath =
+        championId && baseSkinId
+          ? `/lol-game-data/assets/v1/champion-chroma-images/${championId}/${baseSkinId}.png`
+          : null;
+
       const baseSkinChroma = {
         id: baseSkinId,
         name: "Default",
@@ -2287,22 +2547,29 @@
         selected: false, // Will be set by markSelectedChroma
         locked: false,
       };
-      const allChromas = [baseSkinChroma, ...cachedChromas.map((chroma, index) => ({
-        ...chroma,
-        selected: false, // Will be set by markSelectedChroma
-      }))];
+      const allChromas = [
+        baseSkinChroma,
+        ...cachedChromas.map((chroma, index) => ({
+          ...chroma,
+          selected: false, // Will be set by markSelectedChroma
+        })),
+      ];
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
     // Fallback: construct chroma paths based on skin ID
     // This should rarely be used if champion data is properly fetched
-    log.debug(`[getChromaData] No chromas found in cache for skin ${baseSkinId}, using fallback`);
+    log.debug(
+      `[getChromaData] No chromas found in cache for skin ${baseSkinId}, using fallback`
+    );
     const fallbackSkinId = baseSkinId ?? skinData.id;
     const effectiveSkinId = getNumericId(fallbackSkinId);
     const fallbackChampionId =
-      skinData.championId || getChampionIdFromContext(skinData, effectiveSkinId);
+      skinData.championId ||
+      getChampionIdFromContext(skinData, effectiveSkinId);
     const finalChampionId =
-      fallbackChampionId || (Number.isFinite(effectiveSkinId)
+      fallbackChampionId ||
+      (Number.isFinite(effectiveSkinId)
         ? Math.floor(effectiveSkinId / 1000)
         : null);
 
@@ -2313,7 +2580,9 @@
 
     const championForImages = finalChampionId;
     if (!championForImages) {
-      log.debug(`[getChromaData] Could not determine champion ID for skin ${effectiveSkinId}`);
+      log.debug(
+        `[getChromaData] Could not determine champion ID for skin ${effectiveSkinId}`
+      );
       return [];
     }
     const chromas = [];
@@ -2331,9 +2600,10 @@
 
     // Try to find additional chromas (typically numbered 001-012)
     // Create placeholder chromas with default colors if we know the skin has chromas
-    const hasChromas = skinMonitorState?.hasChromas || skinChromaCache.get(effectiveSkinId);
+    const hasChromas =
+      skinMonitorState?.hasChromas || skinChromaCache.get(effectiveSkinId);
     const numPlaceholders = hasChromas ? 12 : 3; // Create more placeholders if we know chromas exist
-    
+
     // Default chroma colors to use as fallback (from official League)
     const defaultColors = [
       "#DF9117", // Orange/Gold
@@ -2349,7 +2619,7 @@
       "#FF1493", // Deep Pink
       "#4169E1", // Royal Blue
     ];
-    
+
     for (let i = 1; i <= numPlaceholders; i++) {
       const chromaId = effectiveSkinId * 1000 + i;
       const colorIndex = (i - 1) % defaultColors.length;
@@ -2364,24 +2634,35 @@
       });
     }
 
-    log.debug(`[getChromaData] Created ${chromas.length} fallback chromas for skin ${effectiveSkinId}`);
+    log.debug(
+      `[getChromaData] Created ${chromas.length} fallback chromas for skin ${effectiveSkinId}`
+    );
     return chromas;
   }
 
   function createChromaPanel(skinData, chromas, buttonElement) {
-    log.info(`[ChromaWheel] createChromaPanel called with ${chromas.length} chromas`);
-    log.debug("createChromaPanel details:", { skinData, chromas, buttonElement });
+    log.info(
+      `[ChromaWheel] createChromaPanel called with ${chromas.length} chromas`
+    );
+    log.debug("createChromaPanel details:", {
+      skinData,
+      chromas,
+      buttonElement,
+    });
 
     // Ensure button element exists and is valid before creating panel
     if (!buttonElement) {
-      log.warn("[ChromaWheel] Cannot create panel: button element not provided");
+      log.warn(
+        "[ChromaWheel] Cannot create panel: button element not provided"
+      );
       return;
     }
 
     // Verify button is visible
-    const buttonVisible = buttonElement.offsetParent !== null && 
-                         buttonElement.style.display !== "none" &&
-                         buttonElement.style.opacity !== "0";
+    const buttonVisible =
+      buttonElement.offsetParent !== null &&
+      buttonElement.style.display !== "none" &&
+      buttonElement.style.opacity !== "0";
     if (!buttonVisible) {
       log.warn("[ChromaWheel] Cannot create panel: button element not visible");
       return;
@@ -2465,11 +2746,15 @@
     if (isAramMode()) {
       if (aramBackgroundImageUrl) {
         bgPath = aramBackgroundImageUrl;
-        log.debug("[ChromaWheel] Using cached ARAM background image for chroma panel");
+        log.debug(
+          "[ChromaWheel] Using cached ARAM background image for chroma panel"
+        );
       } else {
         // Request ARAM background from Python; keep SR background as temporary fallback
         requestAramBackgroundImage();
-        log.debug("[ChromaWheel] ARAM mode detected - requesting ARAM background image");
+        log.debug(
+          "[ChromaWheel] ARAM mode detected - requesting ARAM background image"
+        );
       }
     }
 
@@ -2480,19 +2765,23 @@
     // Set initial preview - use selected chroma if available, otherwise first chroma
     // This matches the official client behavior
     if (chromas.length > 0) {
-      const selectedChroma = chromas.find(c => c.selected) || chromas[0];
+      const selectedChroma = chromas.find((c) => c.selected) || chromas[0];
       updateChromaPreview(selectedChroma, chromaImage);
-      
+
       // Set selectedChromaData based on the selected chroma when panel is created
       // This ensures the button color is correct even if Python hasn't broadcast state yet
       selectedChromaData = {
         id: selectedChroma.id,
-        primaryColor: selectedChroma.primaryColor || selectedChroma.colors?.[1] || selectedChroma.colors?.[0] || null,
+        primaryColor:
+          selectedChroma.primaryColor ||
+          selectedChroma.colors?.[1] ||
+          selectedChroma.colors?.[0] ||
+          null,
         colors: selectedChroma.colors || [],
         name: selectedChroma.name,
         buttonIconPath: selectedChroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms and HOL chromas
       };
-      
+
       // Note: selectedChromaData will be updated by Python's chroma-state message
       // if Python provides better/more accurate data
     } else {
@@ -2547,7 +2836,7 @@
     // Track hover state to ensure preview resets to selected when no button is hovered
     let hoveredChromaId = null;
     const resetToSelectedPreview = () => {
-      const selectedChroma = chromas.find(c => c.selected);
+      const selectedChroma = chromas.find((c) => c.selected);
       if (selectedChroma && hoveredChromaId === null) {
         updateChromaPreview(selectedChroma, chromaImage);
       }
@@ -2576,13 +2865,16 @@
 
       const contents = document.createElement("div");
       contents.className = "contents";
-      
+
       // Check if this is Elementalist Lux form (has buttonIconPath)
-      if (chroma.buttonIconPath && chroma.buttonIconPath.startsWith("local-asset://")) {
+      if (
+        chroma.buttonIconPath &&
+        chroma.buttonIconPath.startsWith("local-asset://")
+      ) {
         // Elementalist Lux form - use local button icon
         // Format: local-asset://elementalist_buttons/{form_id}.png
         const iconPath = chroma.buttonIconPath.replace("local-asset://", "");
-        
+
         // Request button icon from Python via bridge
         sendToBridge({
           type: "request-local-asset",
@@ -2590,12 +2882,14 @@
           chromaId: chroma.id,
           timestamp: Date.now(),
         });
-        
+
         // Store pending request so we can apply the URL when Python responds
         pendingLocalAssets.set(chroma.id, { contents, chroma });
-        
-        log.debug(`[ChromaWheel] Requested local button icon: ${iconPath} for chroma ${chroma.id}`);
-        
+
+        log.debug(
+          `[ChromaWheel] Requested local button icon: ${iconPath} for chroma ${chroma.id}`
+        );
+
         // Use placeholder until Python serves the image
         contents.style.background = "";
         contents.style.backgroundImage = "";
@@ -2603,42 +2897,70 @@
         contents.style.backgroundSize = "cover";
         contents.style.backgroundPosition = "center";
         contents.style.backgroundRepeat = "no-repeat";
-        log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using local button icon (placeholder until Python serves)`);
+        log.debug(
+          `[ChromaWheel] Button ${index + 1}: ${
+            chroma.name
+          } - using local button icon (placeholder until Python serves)`
+        );
       } else {
         // Check if this is the base/default skin button
-        const isDefaultButton = chroma.name === "Default" && !chroma.primaryColor && !chroma.colors?.length;
-        
+        const isDefaultButton =
+          chroma.name === "Default" &&
+          !chroma.primaryColor &&
+          !chroma.colors?.length;
+
         if (isDefaultButton) {
           // Base/default button: use the original gradient (beige with red stripe) - matching official League
-          contents.style.background = "linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2)";
+          contents.style.background =
+            "linear-gradient(135deg, #f0e6d2, #f0e6d2 48%, #be1e37 0, #be1e37 52%, #f0e6d2 0, #f0e6d2)";
           contents.style.backgroundSize = "cover";
           contents.style.backgroundPosition = "center";
           contents.style.backgroundRepeat = "no-repeat";
-          log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - using default gradient`);
+          log.debug(
+            `[ChromaWheel] Button ${index + 1}: ${
+              chroma.name
+            } - using default gradient`
+          );
         } else {
           // Chroma buttons: use chroma color if available, otherwise fall back to image
-          const primaryColor = chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
+          const primaryColor =
+            chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0];
           if (primaryColor) {
             // Ensure color has # prefix
-            const color = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
+            const color = primaryColor.startsWith("#")
+              ? primaryColor
+              : `#${primaryColor}`;
             // Use solid background color (no gradient to avoid darkening)
             contents.style.backgroundColor = color;
             contents.style.background = color;
-            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with color ${color}`);
+            log.debug(
+              `[ChromaWheel] Button ${index + 1}: ${
+                chroma.name
+              } with color ${color}`
+            );
           } else if (chroma.imagePath) {
             // Fall back to image if no color available
             contents.style.background = `url('${chroma.imagePath}')`;
             contents.style.backgroundSize = "cover";
             contents.style.backgroundPosition = "center";
             contents.style.backgroundRepeat = "no-repeat";
-            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath}`);
+            log.debug(
+              `[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${
+                chroma.imagePath
+              }`
+            );
           } else {
             // Default fallback color if no color or image is available
-            contents.style.background = "linear-gradient(135deg, #f0e6d2 0%, #f0e6d2 50%, #f0e6d2 50%, #f0e6d2 100%)";
+            contents.style.background =
+              "linear-gradient(135deg, #f0e6d2 0%, #f0e6d2 50%, #f0e6d2 50%, #f0e6d2 100%)";
             contents.style.backgroundSize = "cover";
             contents.style.backgroundPosition = "center";
             contents.style.backgroundRepeat = "no-repeat";
-            log.debug(`[ChromaWheel] Button ${index + 1}: ${chroma.name} - no color or image, using default`);
+            log.debug(
+              `[ChromaWheel] Button ${index + 1}: ${
+                chroma.name
+              } - no color or image, using default`
+            );
           }
         }
       }
@@ -2654,7 +2976,9 @@
       const handleClick = (e) => {
         e.stopPropagation();
         e.preventDefault();
-        log.info(`[ChromaWheel] Chroma button clicked: ${chroma.name} (ID: ${chroma.id}, locked: ${chroma.locked})`);
+        log.info(
+          `[ChromaWheel] Chroma button clicked: ${chroma.name} (ID: ${chroma.id}, locked: ${chroma.locked})`
+        );
         // Play official chroma click sound (matches Riot's sfx-cs-button-chromas-click.ogg)
         playChromaClickSound();
         selectChroma(chroma, chromas, chromaImage, chromaButton, scrollable);
@@ -2684,7 +3008,7 @@
 
     log.info(`[ChromaWheel] Created ${buttonCount} chroma buttons in panel`);
     scrollable.appendChild(chromaList);
-    
+
     // Update chroma button color after all buttons are created
     updateChromaButtonColor();
 
@@ -2807,7 +3131,7 @@
     // For special skins (Elementalist Lux, HOL chromas), use local preview paths
     // For regular chromas, use LCU API paths
     const imagePath = chroma.imagePath;
-    
+
     if (imagePath) {
       // Check if this is a local preview path (special skins)
       if (imagePath.startsWith("local-preview://")) {
@@ -2818,7 +3142,7 @@
           const championId = pathParts[0];
           const skinId = pathParts[1];
           const chromaId = pathParts[2];
-          
+
           // Request preview from Python
           sendToBridge({
             type: "request-local-preview",
@@ -2827,12 +3151,14 @@
             chromaId: parseInt(chromaId),
             timestamp: Date.now(),
           });
-          
+
           // Store pending request so we can apply the URL when Python responds
           pendingLocalPreviews.set(parseInt(chromaId), { chromaImage, chroma });
-          
-          log.debug(`[ChromaWheel] Requested local preview for champion ${championId}, skin ${skinId}, chroma ${chromaId}`);
-          
+
+          log.debug(
+            `[ChromaWheel] Requested local preview for champion ${championId}, skin ${skinId}, chroma ${chromaId}`
+          );
+
           // Hide until Python serves the image
           chromaImage.style.background = "";
           chromaImage.style.backgroundImage = "";
@@ -2866,27 +3192,39 @@
     buttons.forEach((button) => {
       const content = button.querySelector(".content");
       if (!content) {
-        log.debug(`[ChromaWheel] Button color update: no .content element found`);
+        log.debug(
+          `[ChromaWheel] Button color update: no .content element found`
+        );
         return;
       }
 
       // Check if this chroma has a button icon path (Elementalist Lux forms or HOL chromas)
-      if (selectedChromaData && selectedChromaData.buttonIconPath && selectedChromaData.buttonIconPath.startsWith("local-asset://")) {
+      if (
+        selectedChromaData &&
+        selectedChromaData.buttonIconPath &&
+        selectedChromaData.buttonIconPath.startsWith("local-asset://")
+      ) {
         // Elementalist Lux form or HOL chroma - always request the icon to ensure it matches the selected chroma
         // Track the last applied chroma ID on the button to detect when switching between chromas
         const lastAppliedChromaId = content.getAttribute("data-last-chroma-id");
-        const chromaIdChanged = lastAppliedChromaId !== String(selectedChromaData.id);
-        
+        const chromaIdChanged =
+          lastAppliedChromaId !== String(selectedChromaData.id);
+
         // Check if we already have a pending request for THIS specific chroma ID
-        const hasPendingRequestForThisChroma = pendingLocalAssets.has(selectedChromaData.id);
-        
+        const hasPendingRequestForThisChroma = pendingLocalAssets.has(
+          selectedChromaData.id
+        );
+
         // Always request if:
         // 1. Chroma ID changed (switching between forms/chromas)
         // 2. No pending request for this chroma ID (new request needed)
         // This ensures the icon updates immediately when switching between chromas
         if (chromaIdChanged || !hasPendingRequestForThisChroma) {
-          const iconPath = selectedChromaData.buttonIconPath.replace("local-asset://", "");
-          
+          const iconPath = selectedChromaData.buttonIconPath.replace(
+            "local-asset://",
+            ""
+          );
+
           // Request button icon from Python via bridge
           sendToBridge({
             type: "request-local-asset",
@@ -2894,76 +3232,128 @@
             chromaId: selectedChromaData.id,
             timestamp: Date.now(),
           });
-          
+
           // Store pending request so we can apply the URL when Python responds
-          pendingLocalAssets.set(selectedChromaData.id, { contents: content, chroma: selectedChromaData });
-          
+          pendingLocalAssets.set(selectedChromaData.id, {
+            contents: content,
+            chroma: selectedChromaData,
+          });
+
           // Mark that we're requesting this chroma ID
-          content.setAttribute("data-last-chroma-id", String(selectedChromaData.id));
-          
-          log.debug(`[ChromaWheel] Requested button icon for chroma selection button: ${iconPath} for chroma ${selectedChromaData.id} (chromaIdChanged: ${chromaIdChanged})`);
-          
+          content.setAttribute(
+            "data-last-chroma-id",
+            String(selectedChromaData.id)
+          );
+
+          log.debug(
+            `[ChromaWheel] Requested button icon for chroma selection button: ${iconPath} for chroma ${selectedChromaData.id} (chromaIdChanged: ${chromaIdChanged})`
+          );
+
           // Only show placeholder if there's no existing icon
           // If we're switching between chromas, keep the old icon visible until the new one loads (prevents flicker)
           const existingBgImage = content.style.backgroundImage;
-          const hasExistingIcon = existingBgImage && existingBgImage !== "none" && existingBgImage !== "";
-          
+          const hasExistingIcon =
+            existingBgImage &&
+            existingBgImage !== "none" &&
+            existingBgImage !== "";
+
           if (!hasExistingIcon) {
             // No existing icon - show placeholder
             content.style.setProperty("background", "", "important");
             content.style.setProperty("background-image", "", "important");
-            content.style.setProperty("background-color", "#1e2328", "important");
-            content.style.setProperty("background-size", "contain", "important");
-            content.style.setProperty("background-position", "center", "important");
-            content.style.setProperty("background-repeat", "no-repeat", "important");
-            log.debug(`[ChromaWheel] Button icon: using placeholder until Python serves ${iconPath}`);
+            content.style.setProperty(
+              "background-color",
+              "#1e2328",
+              "important"
+            );
+            content.style.setProperty(
+              "background-size",
+              "contain",
+              "important"
+            );
+            content.style.setProperty(
+              "background-position",
+              "center",
+              "important"
+            );
+            content.style.setProperty(
+              "background-repeat",
+              "no-repeat",
+              "important"
+            );
+            log.debug(
+              `[ChromaWheel] Button icon: using placeholder until Python serves ${iconPath}`
+            );
           } else {
             // Existing icon present - keep it visible while new one loads (prevents flicker)
-            log.debug(`[ChromaWheel] Button icon: keeping existing icon visible while new icon loads for chroma ${selectedChromaData.id}`);
+            log.debug(
+              `[ChromaWheel] Button icon: keeping existing icon visible while new icon loads for chroma ${selectedChromaData.id}`
+            );
           }
         } else {
           // Icon already loaded and request already pending for this chroma - keep it
-          log.debug(`[ChromaWheel] Button icon already loaded and pending for chroma ${selectedChromaData.id}, keeping existing icon`);
+          log.debug(
+            `[ChromaWheel] Button icon already loaded and pending for chroma ${selectedChromaData.id}, keeping existing icon`
+          );
         }
         return;
       }
 
       // Check if this is the default chroma (no color or name is "Default")
       // BUT: For Elementalist Lux and HOL chromas, even the "Default" button should show its icon, not the generic default
-      const isElementalistLux = selectedChromaData && (
-        selectedChromaData.id === 99007 || 
-        (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999)
-      );
-      const isHolChroma = selectedChromaData && (
-        selectedChromaData.id === 145070 || 
-        selectedChromaData.id === 145071 || 
-        selectedChromaData.id === 103085 || 
-        selectedChromaData.id === 103086
-      );
-      const isDefault = !selectedChromaData || 
-                       (selectedChromaData.name === "Default" && !isElementalistLux && !isHolChroma) || 
-                       (!selectedChromaData.primaryColor && !isElementalistLux && !isHolChroma) ||
-                       selectedChromaData.id === 0;
+      const isElementalistLux =
+        selectedChromaData &&
+        (selectedChromaData.id === 99007 ||
+          (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999));
+      const isHolChroma =
+        selectedChromaData &&
+        (selectedChromaData.id === 145070 ||
+          selectedChromaData.id === 145071 ||
+          selectedChromaData.id === 103085 ||
+          selectedChromaData.id === 103086);
+      const isDefault =
+        !selectedChromaData ||
+        (selectedChromaData.name === "Default" &&
+          !isElementalistLux &&
+          !isHolChroma) ||
+        (!selectedChromaData.primaryColor &&
+          !isElementalistLux &&
+          !isHolChroma) ||
+        selectedChromaData.id === 0;
 
       if (isDefault) {
         // Default chroma: use the original button-chroma.png image
         // Use setProperty with !important to override CSS rules
-        content.style.setProperty("background", "url(/fe/lol-champ-select/images/config/button-chroma.png) no-repeat", "important");
+        content.style.setProperty(
+          "background",
+          "url(/fe/lol-champ-select/images/config/button-chroma.png) no-repeat",
+          "important"
+        );
         content.style.setProperty("background-size", "contain", "important");
-        content.style.setProperty("background-color", "transparent", "important");
-        content.style.setProperty("background-image", "url(/fe/lol-champ-select/images/config/button-chroma.png)", "important");
+        content.style.setProperty(
+          "background-color",
+          "transparent",
+          "important"
+        );
+        content.style.setProperty(
+          "background-image",
+          "url(/fe/lol-champ-select/images/config/button-chroma.png)",
+          "important"
+        );
         log.debug(`[ChromaWheel] Button color: default (no color)`);
       } else {
         // Chroma with color: use the chroma color as background
-        const color = selectedChromaData.primaryColor.startsWith("#") 
-          ? selectedChromaData.primaryColor 
+        const color = selectedChromaData.primaryColor.startsWith("#")
+          ? selectedChromaData.primaryColor
           : `#${selectedChromaData.primaryColor}`;
         // Use setProperty with !important to override CSS rules
         content.style.setProperty("background", color, "important");
         content.style.setProperty("background-color", color, "important");
         content.style.setProperty("background-image", "none", "important");
         content.style.setProperty("background-size", "cover", "important");
-        log.debug(`[ChromaWheel] Button color updated: ${color} (chroma ID: ${selectedChromaData.id}, name: ${selectedChromaData.name})`);
+        log.debug(
+          `[ChromaWheel] Button color updated: ${color} (chroma ID: ${selectedChromaData.id}, name: ${selectedChromaData.name})`
+        );
       }
     });
   }
@@ -2975,8 +3365,10 @@
     clickedButton,
     scrollable
   ) {
-    log.info(`[ChromaWheel] selectChroma called for: ${chroma.name} (ID: ${chroma.id})`);
-    
+    log.info(
+      `[ChromaWheel] selectChroma called for: ${chroma.name} (ID: ${chroma.id})`
+    );
+
     // Update selected state
     allChromas.forEach((c) => {
       c.selected = c.id === chroma.id;
@@ -2995,22 +3387,25 @@
     // This ensures the button color updates right away, even before Python responds
     selectedChromaData = {
       id: chroma.id,
-      primaryColor: chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0] || null,
+      primaryColor:
+        chroma.primaryColor || chroma.colors?.[1] || chroma.colors?.[0] || null,
       colors: chroma.colors || [],
       name: chroma.name,
       buttonIconPath: chroma.buttonIconPath || null, // Include button icon path for Elementalist Lux forms and HOL chromas
     };
-    
+
     // Update button color immediately
     updateChromaButtonColor();
-    
+
     // Note: selectedChromaData will be updated again by Python's chroma-state message
     // if Python provides better/more accurate data
 
     // Send chroma selection to Python thread (like SkinMonitor does)
     const championId = skinMonitorState?.championId || null;
     const baseSkinId = skinMonitorState?.skinId || null;
-    log.info(`[ChromaWheel] Sending chroma selection to Python: ID=${chroma.id}, championId=${championId}, baseSkinId=${baseSkinId}`);
+    log.info(
+      `[ChromaWheel] Sending chroma selection to Python: ID=${chroma.id}, championId=${championId}, baseSkinId=${baseSkinId}`
+    );
     sendToBridge({
       type: "chroma-selection",
       skinId: chroma.id,
@@ -3056,19 +3451,25 @@
 
     // Check if chroma button exists and is visible before allowing panel to open
     if (!buttonElement) {
-      log.warn("[ChromaWheel] Cannot open panel: chroma button element not provided");
+      log.warn(
+        "[ChromaWheel] Cannot open panel: chroma button element not provided"
+      );
       return;
     }
 
     // Verify the button is actually visible and has chromas
-    const buttonVisible = buttonElement.offsetParent !== null && 
-                         buttonElement.style.display !== "none" &&
-                         buttonElement.style.opacity !== "0";
-    const hasChromas = skinMonitorState?.hasChromas || 
-                      buttonElement._luLastVisibilityState === true;
+    const buttonVisible =
+      buttonElement.offsetParent !== null &&
+      buttonElement.style.display !== "none" &&
+      buttonElement.style.opacity !== "0";
+    const hasChromas =
+      skinMonitorState?.hasChromas ||
+      buttonElement._luLastVisibilityState === true;
 
     if (!buttonVisible || !hasChromas) {
-      log.warn("[ChromaWheel] Cannot open panel: chroma button not visible or no chromas");
+      log.warn(
+        "[ChromaWheel] Cannot open panel: chroma button not visible or no chromas"
+      );
       return;
     }
 
@@ -3082,10 +3483,12 @@
     log.info("[ChromaWheel] Opening chroma panel...");
     log.debug("Extracting skin data...");
     let skinData = getCachedSkinData(skinItem);
-    
+
     // If we couldn't extract skin data from DOM, use the skin state data we have
     if (!skinData || !extractSkinIdFromData(skinData)) {
-      log.info("[ChromaWheel] Could not extract skin data from DOM, using skin state data");
+      log.info(
+        "[ChromaWheel] Could not extract skin data from DOM, using skin state data"
+      );
       if (skinMonitorState && skinMonitorState.skinId) {
         skinData = {
           id: skinMonitorState.skinId,
@@ -3093,13 +3496,16 @@
           championId: skinMonitorState.championId,
           name: skinMonitorState.name,
         };
-        log.info("[ChromaWheel] Using skin state data:", { 
+        log.info("[ChromaWheel] Using skin state data:", {
           skinId: skinData.skinId,
           championId: skinData.championId,
-          name: skinData.name 
+          name: skinData.name,
         });
       } else {
-        log.warn("[ChromaWheel] Could not extract skin data from skin item and no skin state available", skinItem);
+        log.warn(
+          "[ChromaWheel] Could not extract skin data from skin item and no skin state available",
+          skinItem
+        );
         // Try to create panel with minimal data anyway
         const fallbackData = {
           name: "Champion",
@@ -3119,31 +3525,93 @@
         return;
       }
     } else {
-      log.info("[ChromaWheel] Skin data extracted from DOM:", { 
+      log.info("[ChromaWheel] Skin data extracted from DOM:", {
         skinId: extractSkinIdFromData(skinData),
         championId: skinData?.championId,
-        name: skinData?.name 
+        name: skinData?.name,
       });
     }
 
     log.info("[ChromaWheel] Getting chroma data...");
-    
+
     // Ensure champion data is fetched before getting chromas
-    const championId = getChampionIdFromContext(skinData, extractSkinIdFromData(skinData), skinItem);
-    log.info(`[ChromaWheel] Champion ID: ${championId}, Cache has data: ${championId ? championSkinCache.has(championId) : 'N/A'}`);
+    const championId = getChampionIdFromContext(
+      skinData,
+      extractSkinIdFromData(skinData),
+      skinItem
+    );
+    log.info(
+      `[ChromaWheel] Champion ID: ${championId}, Cache has data: ${
+        championId ? championSkinCache.has(championId) : "N/A"
+      }`
+    );
     if (championId) {
       // Check if fetch is already in progress
       const fetchInProgress = pendingChampionRequests.has(championId);
-      
+
       if (!championSkinCache.has(championId)) {
         if (fetchInProgress) {
-          log.debug(`Champion ${championId} data fetch already in progress, waiting...`);
+          log.debug(
+            `Champion ${championId} data fetch already in progress, waiting...`
+          );
           // Wait for existing fetch to complete
-          pendingChampionRequests.get(championId).then(() => {
+          pendingChampionRequests
+            .get(championId)
+            .then(() => {
+              const chromas = getChromaData(skinData);
+              log.debug("Chromas found after waiting for fetch:", chromas);
+              if (chromas.length === 0) {
+                log.warn(
+                  "No chromas found after fetch completed, using fallback"
+                );
+                const defaultChromas = [
+                  {
+                    id: skinData.skinId || skinData.id || 0,
+                    name: "Default",
+                    imagePath: "",
+                    selected: true,
+                    locked: false,
+                  },
+                ];
+                createChromaPanel(skinData, defaultChromas, buttonElement);
+                return;
+              }
+              createChromaPanel(skinData, chromas, buttonElement);
+            })
+            .catch((err) => {
+              log.warn(
+                "Failed while waiting for champion data, using available chromas",
+                err
+              );
+              const chromas = getChromaData(skinData);
+              if (chromas.length === 0) {
+                const defaultChromas = [
+                  {
+                    id: skinData.skinId || skinData.id || 0,
+                    name: "Default",
+                    imagePath: "",
+                    selected: true,
+                    locked: false,
+                  },
+                ];
+                createChromaPanel(skinData, defaultChromas, buttonElement);
+              } else {
+                createChromaPanel(skinData, chromas, buttonElement);
+              }
+            });
+          return; // Exit early, will create panel in promise callback
+        }
+
+        log.debug(`Champion ${championId} data not cached, fetching...`);
+        fetchChampionSkinData(championId)
+          .then(() => {
+            // Retry getting chromas after fetch completes
             const chromas = getChromaData(skinData);
-            log.debug("Chromas found after waiting for fetch:", chromas);
+            log.debug("Chromas found after fetch:", chromas);
             if (chromas.length === 0) {
-              log.warn("No chromas found after fetch completed, using fallback");
+              log.warn(
+                "No chromas found for this skin after fetch, creating with default"
+              );
               const defaultChromas = [
                 {
                   id: skinData.skinId || skinData.id || 0,
@@ -3156,9 +3624,15 @@
               createChromaPanel(skinData, defaultChromas, buttonElement);
               return;
             }
+            log.debug("Creating chroma panel with fetched chromas...");
             createChromaPanel(skinData, chromas, buttonElement);
-          }).catch((err) => {
-            log.warn("Failed while waiting for champion data, using available chromas", err);
+            log.info("Chroma panel opened successfully");
+          })
+          .catch((err) => {
+            log.warn(
+              "Failed to fetch champion data, using available chromas",
+              err
+            );
             const chromas = getChromaData(skinData);
             if (chromas.length === 0) {
               const defaultChromas = [
@@ -3175,66 +3649,28 @@
               createChromaPanel(skinData, chromas, buttonElement);
             }
           });
-          return; // Exit early, will create panel in promise callback
-        }
-        
-        log.debug(`Champion ${championId} data not cached, fetching...`);
-        fetchChampionSkinData(championId).then(() => {
-        // Retry getting chromas after fetch completes
-        const chromas = getChromaData(skinData);
-        log.debug("Chromas found after fetch:", chromas);
-        if (chromas.length === 0) {
-          log.warn("No chromas found for this skin after fetch, creating with default");
-          const defaultChromas = [
-            {
-              id: skinData.skinId || skinData.id || 0,
-              name: "Default",
-              imagePath: "",
-              selected: true,
-              locked: false,
-            },
-          ];
-          createChromaPanel(skinData, defaultChromas, buttonElement);
-          return;
-        }
-        log.debug("Creating chroma panel with fetched chromas...");
-        createChromaPanel(skinData, chromas, buttonElement);
-        log.info("Chroma panel opened successfully");
-      }).catch((err) => {
-        log.warn("Failed to fetch champion data, using available chromas", err);
-        const chromas = getChromaData(skinData);
-        if (chromas.length === 0) {
-          const defaultChromas = [
-            {
-              id: skinData.skinId || skinData.id || 0,
-              name: "Default",
-              imagePath: "",
-              selected: true,
-              locked: false,
-            },
-          ];
-          createChromaPanel(skinData, defaultChromas, buttonElement);
-        } else {
-          createChromaPanel(skinData, chromas, buttonElement);
-        }
-      });
-      return; // Exit early, will create panel in promise callback
+        return; // Exit early, will create panel in promise callback
       }
     }
-    
+
     const chromas = getChromaData(skinData);
     log.info(`[ChromaWheel] Chromas found: ${chromas.length} total`);
-    log.info("[ChromaWheel] Chroma details:", chromas.map(c => ({ 
-      id: c.id, 
-      name: c.name, 
-      hasColor: !!c.primaryColor, 
-      color: c.primaryColor,
-      hasImage: !!c.imagePath,
-      locked: c.locked 
-    })));
+    log.info(
+      "[ChromaWheel] Chroma details:",
+      chromas.map((c) => ({
+        id: c.id,
+        name: c.name,
+        hasColor: !!c.primaryColor,
+        color: c.primaryColor,
+        hasImage: !!c.imagePath,
+        locked: c.locked,
+      }))
+    );
 
     if (chromas.length === 0) {
-      log.warn("[ChromaWheel] No chromas found for this skin, creating with default");
+      log.warn(
+        "[ChromaWheel] No chromas found for this skin, creating with default"
+      );
       // Create at least one default chroma
       const defaultChromas = [
         {
@@ -3249,9 +3685,13 @@
       return;
     }
 
-    log.info(`[ChromaWheel] Creating chroma panel with ${chromas.length} chromas...`);
+    log.info(
+      `[ChromaWheel] Creating chroma panel with ${chromas.length} chromas...`
+    );
     createChromaPanel(skinData, chromas, buttonElement);
-    log.info(`[ChromaWheel] Chroma panel opened successfully with ${chromas.length} chroma buttons`);
+    log.info(
+      `[ChromaWheel] Chroma panel opened successfully with ${chromas.length} chroma buttons`
+    );
   }
 
   function setupObserver() {
@@ -3283,19 +3723,35 @@
 
     if (window.__roseSkinState) {
       skinMonitorState = window.__roseSkinState;
-      
+
       // Proactively fetch champion data if initial state has chromas
-      if (skinMonitorState && skinMonitorState.hasChromas && skinMonitorState.championId && skinMonitorState.skinId) {
+      if (
+        skinMonitorState &&
+        skinMonitorState.hasChromas &&
+        skinMonitorState.championId &&
+        skinMonitorState.skinId
+      ) {
         const championId = skinMonitorState.championId;
         if (!championSkinCache.has(championId)) {
-          log.info(`[ChromaWheel] Proactively fetching champion ${championId} data for initial skin ${skinMonitorState.skinId} with chromas`);
-          fetchChampionSkinData(championId).then(() => {
-            log.info(`[ChromaWheel] Successfully fetched champion ${championId} data (initial)`);
-          }).catch((err) => {
-            log.warn(`[ChromaWheel] Failed to proactively fetch champion ${championId} data (initial)`, err);
-          });
+          log.info(
+            `[ChromaWheel] Proactively fetching champion ${championId} data for initial skin ${skinMonitorState.skinId} with chromas`
+          );
+          fetchChampionSkinData(championId)
+            .then(() => {
+              log.info(
+                `[ChromaWheel] Successfully fetched champion ${championId} data (initial)`
+              );
+            })
+            .catch((err) => {
+              log.warn(
+                `[ChromaWheel] Failed to proactively fetch champion ${championId} data (initial)`,
+                err
+              );
+            });
         } else {
-          log.info(`[ChromaWheel] Champion ${championId} data already cached (initial), skipping fetch`);
+          log.info(
+            `[ChromaWheel] Champion ${championId} data already cached (initial), skipping fetch`
+          );
         }
       }
     }
@@ -3311,40 +3767,52 @@
       emitBridgeLog("skin_state_update", detail || {});
       const prevState = skinMonitorState;
       skinMonitorState = detail || null;
-      
+
       // Reset selected chroma data when skin changes (not just chroma selection)
       if (prevState && prevState.skinId !== detail?.skinId) {
         selectedChromaData = null;
         updateChromaButtonColor(); // Reset button to default image
       }
-      
+
       // Proactively fetch champion data when a skin with chromas is detected
       if (detail && detail.hasChromas && detail.championId && detail.skinId) {
         const championId = detail.championId;
         const skinId = detail.skinId;
-        
+
         // Only fetch if champion data isn't cached yet, or if skin changed
-        const shouldFetch = !championSkinCache.has(championId) || 
-                           (prevState && prevState.skinId !== skinId);
-        
+        const shouldFetch =
+          !championSkinCache.has(championId) ||
+          (prevState && prevState.skinId !== skinId);
+
         if (shouldFetch) {
-          log.info(`[ChromaWheel] Proactively fetching champion ${championId} data for skin ${skinId} with chromas`);
-          fetchChampionSkinData(championId).then(() => {
-            log.info(`[ChromaWheel] Successfully fetched champion ${championId} data`);
-            // Trigger a rescan to update button visibility if needed
-            try {
-              scanSkinSelection();
-            } catch (e) {
-              log.debug("scanSkinSelection failed after champion fetch", e);
-            }
-          }).catch((err) => {
-            log.warn(`[ChromaWheel] Failed to proactively fetch champion ${championId} data`, err);
-          });
+          log.info(
+            `[ChromaWheel] Proactively fetching champion ${championId} data for skin ${skinId} with chromas`
+          );
+          fetchChampionSkinData(championId)
+            .then(() => {
+              log.info(
+                `[ChromaWheel] Successfully fetched champion ${championId} data`
+              );
+              // Trigger a rescan to update button visibility if needed
+              try {
+                scanSkinSelection();
+              } catch (e) {
+                log.debug("scanSkinSelection failed after champion fetch", e);
+              }
+            })
+            .catch((err) => {
+              log.warn(
+                `[ChromaWheel] Failed to proactively fetch champion ${championId} data`,
+                err
+              );
+            });
         } else {
-          log.info(`[ChromaWheel] Champion ${championId} data already cached, skipping proactive fetch`);
+          log.info(
+            `[ChromaWheel] Champion ${championId} data already cached, skipping proactive fetch`
+          );
         }
       }
-      
+
       try {
         scanSkinSelection();
       } catch (e) {
@@ -3355,6 +3823,8 @@
 
   let _initializing = false;
   let _initialized = false;
+  let _retryCount = 0;
+  const MAX_RETRIES = 100; // Maximum number of retry attempts
 
   async function init() {
     // Prevent multiple concurrent initializations (but allow recursive retry)
@@ -3366,9 +3836,19 @@
     if (_initializing) {
       // Allow recursive call to proceed only if document is now ready
       if (!document || !document.head) {
+        // Check retry limit to prevent unbounded retries
+        if (_retryCount >= MAX_RETRIES) {
+          log.error(
+            `Init failed: Maximum retry count (${MAX_RETRIES}) reached. Document still not ready.`
+          );
+          _initializing = false;
+          _retryCount = 0; // Reset for next attempt
+          return;
+        }
+        _retryCount++;
         // Still not ready, schedule another retry
         requestAnimationFrame(() => {
-          init().catch(err => {
+          init().catch((err) => {
             log.error("Init failed:", err);
             _initializing = false;
           });
@@ -3379,11 +3859,23 @@
     } else {
       // First call - set flag BEFORE document check to prevent race condition
       _initializing = true;
+      // Don't reset retry counter here - it should persist across retries
+      // Only reset on successful initialization
 
       if (!document || !document.head) {
+        // Check retry limit BEFORE incrementing to prevent unbounded retries
+        if (_retryCount >= MAX_RETRIES) {
+          log.error(
+            `Init failed: Maximum retry count (${MAX_RETRIES}) reached. Document still not ready.`
+          );
+          _initializing = false;
+          _retryCount = 0; // Reset for next attempt
+          return;
+        }
+        _retryCount++;
         // Use synchronous wrapper to prevent multiple concurrent schedules
         requestAnimationFrame(() => {
-          init().catch(err => {
+          init().catch((err) => {
             log.error("Init failed:", err);
             _initializing = false;
           });
@@ -3402,6 +3894,7 @@
       setupBridgeSocket(); // Initialize WebSocket connection for sending chroma selection to Python
       log.info("fake chroma button creation active");
       _initialized = true;
+      _retryCount = 0; // Reset retry counter on success
     } catch (err) {
       log.error("Init failed:", err);
     } finally {
@@ -3415,8 +3908,18 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        init().catch((err) => {
+          log.error("Init failed:", err);
+        });
+      },
+      { once: true }
+    );
   } else {
-    init();
+    init().catch((err) => {
+      log.error("Init failed:", err);
+    });
   }
 })();
