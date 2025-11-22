@@ -3957,6 +3957,7 @@
       _retryCount = 0; // Reset retry counter on success
     } catch (err) {
       log.error("Init failed:", err);
+      throw err; // Re-throw to propagate error to .catch() handlers
     } finally {
       _initializing = false;
     }
