@@ -2032,17 +2032,28 @@
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
 
-    // Debug logging for troubleshooting - use both log and bridge for visibility
+    // Debug logging for troubleshooting - only log when state changes
     if (isCurrent) {
-      log.info(
-        `[ChromaWheel] Current skin item found: skinId=${currentSkinId}, hasChromas=${hasChromas}, championLocked=${championLocked}, existingButton=${!!existingButton}`
-      );
-      emitBridgeLog("current_skin_item_found", {
+      const lastLogState = ensureFakeButton._lastLogState;
+      const currentLogState = {
         skinId: currentSkinId,
         hasChromas,
         championLocked,
         existingButton: !!existingButton,
-      });
+      };
+      if (
+        !lastLogState ||
+        lastLogState.skinId !== currentLogState.skinId ||
+        lastLogState.hasChromas !== currentLogState.hasChromas ||
+        lastLogState.championLocked !== currentLogState.championLocked ||
+        lastLogState.existingButton !== currentLogState.existingButton
+      ) {
+        log.debug(
+          `[ChromaWheel] Current skin item found: skinId=${currentSkinId}, hasChromas=${hasChromas}, championLocked=${championLocked}, existingButton=${!!existingButton}`
+        );
+        emitBridgeLog("current_skin_item_found", currentLogState);
+        ensureFakeButton._lastLogState = currentLogState;
+      }
     }
 
     if (!isCurrent) {
@@ -2083,9 +2094,21 @@
           championLocked: championLocked,
         });
       } else {
-        log.info(
-          `[ChromaWheel] Button already exists for skin ${currentSkinId}, updating visibility`
-        );
+        // Only log button exists message when state changes (reduce spam)
+        const lastButtonExistsState = ensureFakeButton._lastButtonExistsState;
+        if (
+          !lastButtonExistsState ||
+          lastButtonExistsState.skinId !== currentSkinId ||
+          lastButtonExistsState.hasChromas !== hasChromas
+        ) {
+          log.debug(
+            `[ChromaWheel] Button already exists for skin ${currentSkinId}, updating visibility`
+          );
+          ensureFakeButton._lastButtonExistsState = {
+            skinId: currentSkinId,
+            hasChromas,
+          };
+        }
       }
 
       updateButtonVisibility(existingButton, hasChromas);
@@ -2118,23 +2141,47 @@
       scanSkinSelection._lastState = currentState;
     }
 
-    // Debug: Check for current skin item - use info level for visibility
+    // Debug: Check for current skin item - only log when state changes
     let currentItemFound = false;
     skinItems.forEach((skinItem) => {
       const offset = getSkinOffset(skinItem);
       if (offset === 2) {
         currentItemFound = true;
-        log.info(
-          `[ChromaWheel] Found current skin item with offset 2, hasChromas: ${skinMonitorState?.hasChromas}, championLocked: ${championLocked}`
-        );
+        // Only log when state changes (skinId or hasChromas)
+        const lastFoundState = scanSkinSelection._lastFoundState;
+        const currentFoundState = {
+          skinId: skinMonitorState?.skinId,
+          hasChromas: skinMonitorState?.hasChromas,
+          championLocked: championLocked,
+        };
+        if (
+          !lastFoundState ||
+          lastFoundState.skinId !== currentFoundState.skinId ||
+          lastFoundState.hasChromas !== currentFoundState.hasChromas ||
+          lastFoundState.championLocked !== currentFoundState.championLocked
+        ) {
+          log.debug(
+            `[ChromaWheel] Found current skin item with offset 2, hasChromas: ${skinMonitorState?.hasChromas}, championLocked: ${championLocked}`
+          );
+          scanSkinSelection._lastFoundState = currentFoundState;
+        }
       }
       ensureFakeButton(skinItem);
     });
 
+    // Only warn once per state change, with debouncing
     if (!currentItemFound && skinItems.length > 0) {
-      log.warn(
-        `[ChromaWheel] Warning: No skin item with offset 2 found, but ${skinItems.length} items exist`
-      );
+      const warningKey = `${skinItems.length}-${skinMonitorState?.skinId}`;
+      const lastWarning = scanSkinSelection._lastWarning;
+      if (lastWarning !== warningKey) {
+        log.warn(
+          `[ChromaWheel] Warning: No skin item with offset 2 found, but ${skinItems.length} items exist`
+        );
+        scanSkinSelection._lastWarning = warningKey;
+      }
+    } else if (currentItemFound) {
+      // Reset warning state when item is found
+      scanSkinSelection._lastWarning = null;
     }
 
     thumbnailWrappers.forEach((thumbnailWrapper) => {
