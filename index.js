@@ -271,17 +271,33 @@
       top: 2px;
     }
 
+    /* Ensure thumbnail-wrapper has relative positioning for absolute button */
+    .thumbnail-wrapper.active-skin {
+      position: relative;
+    }
+
     .thumbnail-wrapper .${BUTTON_CLASS} {
       direction: ltr;
-      background: url(/fe/lol-static-assets/images/skin-viewer/icon-chroma-default.png) 0 0 no-repeat;
-      background-size: contain;
+      background: transparent;
       cursor: pointer;
       height: 28px;
       width: 28px;
+      /* Keep the same positioning as base button for consistency */
+      bottom: 1px;
+      left: 50%;
+      position: absolute;
+      transform: translateX(-50%) translateY(50%);
+      z-index: 10;
     }
 
+    /* Show outer-mask in Swiftplay so .content is visible */
     .thumbnail-wrapper .${BUTTON_CLASS} .outer-mask {
-      display: none;
+      display: block;
+    }
+
+    /* Adjust content positioning in Swiftplay buttons */
+    .thumbnail-wrapper .${BUTTON_CLASS} .content {
+      transform: translate(1px, 1px);
     }
 
     .chroma.icon {
@@ -3229,7 +3245,11 @@
     // Note: Mordekaiser removed - handled by ROSE-FormsWheel
     // If default chroma (no color), keep the button-chroma.png image
     // If chroma has color, use that color as background
+    // This works for both normal champ select and Swiftplay mode
     const buttons = document.querySelectorAll(BUTTON_SELECTOR);
+    log.debug(
+      `[ChromaWheel] updateChromaButtonColor: Found ${buttons.length} button(s) to update`
+    );
     buttons.forEach((button) => {
       const content = button.querySelector(".content");
       if (!content) {
@@ -3391,6 +3411,84 @@
         );
       }
     });
+
+    // Also update the actual .chroma.icon element in Swiftplay mode (the real chroma button)
+    const chromaIcons = document.querySelectorAll(".chroma.icon");
+    if (chromaIcons.length > 0) {
+      chromaIcons.forEach((chromaIcon) => {
+        // Check if this is in an active Swiftplay skin
+        const isActiveSwiftplay = chromaIcon.closest(
+          ".thumbnail-wrapper.active-skin"
+        );
+        if (isActiveSwiftplay) {
+          const isDefault =
+            !selectedChromaData ||
+            selectedChromaData.name === "Default" ||
+            !selectedChromaData.primaryColor ||
+            selectedChromaData.id === 0;
+
+          if (isDefault) {
+            // Default chroma: remove selected class and reset background
+            chromaIcon.classList.remove("selected");
+            chromaIcon.style.setProperty(
+              "background",
+              "url(/fe/lol-static-assets/images/skin-viewer/icon-chroma-default.png) 0 0 no-repeat",
+              "important"
+            );
+            chromaIcon.style.setProperty(
+              "background-size",
+              "contain",
+              "important"
+            );
+            chromaIcon.style.setProperty("border", "none", "important");
+            chromaIcon.style.setProperty("border-radius", "", "important");
+            chromaIcon.style.setProperty("box-shadow", "", "important");
+            chromaIcon.style.setProperty("height", "", "important");
+            chromaIcon.style.setProperty("width", "", "important");
+            log.debug(`[ChromaWheel] Swiftplay .chroma.icon: reset to default`);
+          } else {
+            // Chroma with color: update with linear gradient and selected styling
+            const color = selectedChromaData.primaryColor.startsWith("#")
+              ? selectedChromaData.primaryColor
+              : `#${selectedChromaData.primaryColor}`;
+
+            // Create linear gradient (135deg, color 0%, color 50%, color 50%, color 100%)
+            const gradient = `linear-gradient(135deg, ${color} 0%, ${color} 50%, ${color} 50%, ${color} 100%)`;
+
+            chromaIcon.classList.add("selected");
+            chromaIcon.style.setProperty("background", gradient, "important");
+            chromaIcon.style.setProperty(
+              "border",
+              "2px solid #c89b3c",
+              "important"
+            );
+            chromaIcon.style.setProperty("border-radius", "100%", "important");
+            chromaIcon.style.setProperty(
+              "box-shadow",
+              "inset 0 0 4px 4px rgba(0,0,0,.75), inset 0 0 2px 2px rgba(1,10,19,.75)",
+              "important"
+            );
+            chromaIcon.style.setProperty("height", "23px", "important");
+            chromaIcon.style.setProperty("width", "23px", "important");
+
+            log.debug(
+              `[ChromaWheel] Swiftplay .chroma.icon updated: ${color} (chroma ID: ${selectedChromaData.id})`
+            );
+          }
+        }
+      });
+    }
+
+    // Log summary - this function updates all buttons (normal champ select and Swiftplay)
+    if (buttons.length > 0) {
+      const firstButton = buttons[0];
+      const isSwiftplay = firstButton.closest(".thumbnail-wrapper.active-skin");
+      log.debug(
+        `[ChromaWheel] Updated ${buttons.length} button(s) ${
+          isSwiftplay ? "(Swiftplay mode)" : "(normal champ select)"
+        }`
+      );
+    }
   }
 
   function selectChroma(
