@@ -284,6 +284,24 @@
       display: none;
     }
 
+    /* Swiftplay: Button inside chroma modal container */
+    .shared-skin-chroma-modal .${BUTTON_CLASS} {
+      direction: ltr;
+      background: url(/fe/lol-static-assets/images/skin-viewer/icon-chroma-default.png) 0 0 no-repeat;
+      background-size: contain;
+      cursor: pointer;
+      height: 28px;
+      width: 28px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      z-index: 10;
+    }
+
+    .shared-skin-chroma-modal .${BUTTON_CLASS} .outer-mask {
+      display: none;
+    }
+
     .chroma.icon {
       display: none !important;
     }
@@ -1657,18 +1675,19 @@
         ".skin-selection-item, .thumbnail-wrapper"
       );
       if (skinItem) {
-        // Check if this skin has offset 2
+        // Check if this skin has offset 2 (normal champ select) or is active-skin (Swiftplay)
         const offset = getSkinOffset(skinItem);
-        log.info(`[ChromaWheel] Skin offset: ${offset}`);
+        const isSwiftplayActive = skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin");
+        log.info(`[ChromaWheel] Skin offset: ${offset}, isSwiftplayActive: ${isSwiftplayActive}`);
 
-        if (offset === 2) {
+        if (offset === 2 || isSwiftplayActive) {
           log.info(
-            "[ChromaWheel] Found skin item with offset 2, opening panel"
+            `[ChromaWheel] Found valid skin item (offset=${offset}, swiftplay=${isSwiftplayActive}), opening panel`
           );
           toggleChromaPanel(button, skinItem);
         } else {
           log.info(
-            `[ChromaWheel] Skin offset is ${offset}, not 2. Panel will not open.`
+            `[ChromaWheel] Skin offset is ${offset}, not 2, and not Swiftplay active. Panel will not open.`
           );
         }
       } else {
@@ -1911,6 +1930,11 @@
 
     // Thumbnail wrappers (e.g., Swiftplay lobby) typically flag selection via attributes/classes
     if (skinItem.classList.contains("thumbnail-wrapper")) {
+      // Check for active-skin class (Swiftplay mode)
+      if (skinItem.classList.contains("active-skin")) {
+        return true;
+      }
+      // Check for selected class or aria-selected attribute
       if (
         skinItem.classList.contains("selected") ||
         skinItem.getAttribute("aria-selected") === "true"
@@ -1966,10 +1990,11 @@
       return;
     }
 
-    // Don't create button if champion is not locked
-    if (!championLocked) {
-      // Remove existing button if champion is not locked
-      const existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+    // Don't create button if champion is not locked (except in Swiftplay mode)
+    const isSwiftplay = skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin");
+    if (!championLocked && !isSwiftplay) {
+      // Remove existing button if champion is not locked (and not Swiftplay)
+      let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
       if (existingButton) {
         existingButton.remove();
       }
@@ -1985,7 +2010,14 @@
     );
 
     // Check if button already exists
+    // For Swiftplay, also check inside the chroma modal container
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+    if (!existingButton && skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
+      const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
+      if (chromaModal) {
+        existingButton = chromaModal.querySelector(BUTTON_SELECTOR);
+      }
+    }
 
     // Debug logging for troubleshooting - only log when state changes
     if (isCurrent) {
@@ -2014,6 +2046,17 @@
     if (!isCurrent) {
       if (existingButton) {
         existingButton.remove();
+      } else {
+        // Also check chroma modal for Swiftplay if button not found in main container
+        if (skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
+          const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
+          if (chromaModal) {
+            const buttonInModal = chromaModal.querySelector(BUTTON_SELECTOR);
+            if (buttonInModal) {
+              buttonInModal.remove();
+            }
+          }
+        }
       }
       return;
     }
@@ -2037,8 +2080,26 @@
     try {
       if (!existingButton) {
         const fakeButton = createFakeButton();
-        skinItem.appendChild(fakeButton);
-        existingButton = fakeButton;
+        
+        // For Swiftplay mode (thumbnail-wrapper with active-skin), place button in chroma modal container
+        if (skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
+          const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
+          if (chromaModal) {
+            // Place button inside the chroma modal container (where .chroma.icon is)
+            chromaModal.appendChild(fakeButton);
+            existingButton = fakeButton;
+            log.debug(`[ChromaWheel] Placed button in Swiftplay chroma modal for skin ${currentSkinId}`);
+          } else {
+            // Fallback: append to thumbnail-wrapper if chroma modal not found
+            skinItem.appendChild(fakeButton);
+            existingButton = fakeButton;
+            log.warn(`[ChromaWheel] Chroma modal not found, placed button on thumbnail-wrapper for skin ${currentSkinId}`);
+          }
+        } else {
+          // Normal champ select: append directly to skin item
+          skinItem.appendChild(fakeButton);
+          existingButton = fakeButton;
+        }
         log.info(
           `[ChromaWheel] Created chroma button for skin ${currentSkinId} (hasChromas: ${hasChromas})`
         );
