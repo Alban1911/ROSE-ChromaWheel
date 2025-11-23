@@ -284,24 +284,6 @@
       display: none;
     }
 
-    /* Swiftplay: Button inside chroma modal container */
-    .shared-skin-chroma-modal .${BUTTON_CLASS} {
-      direction: ltr;
-      background: url(/fe/lol-static-assets/images/skin-viewer/icon-chroma-default.png) 0 0 no-repeat;
-      background-size: contain;
-      cursor: pointer;
-      height: 28px;
-      width: 28px;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      z-index: 10;
-    }
-
-    .shared-skin-chroma-modal .${BUTTON_CLASS} .outer-mask {
-      display: none;
-    }
-
     .chroma.icon {
       display: none !important;
     }
@@ -1677,8 +1659,12 @@
       if (skinItem) {
         // Check if this skin has offset 2 (normal champ select) or is active-skin (Swiftplay)
         const offset = getSkinOffset(skinItem);
-        const isSwiftplayActive = skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin");
-        log.info(`[ChromaWheel] Skin offset: ${offset}, isSwiftplayActive: ${isSwiftplayActive}`);
+        const isSwiftplayActive =
+          skinItem.classList.contains("thumbnail-wrapper") &&
+          skinItem.classList.contains("active-skin");
+        log.info(
+          `[ChromaWheel] Skin offset: ${offset}, isSwiftplayActive: ${isSwiftplayActive}`
+        );
 
         if (offset === 2 || isSwiftplayActive) {
           log.info(
@@ -1991,10 +1977,12 @@
     }
 
     // Don't create button if champion is not locked (except in Swiftplay mode)
-    const isSwiftplay = skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin");
+    const isSwiftplay =
+      skinItem.classList.contains("thumbnail-wrapper") &&
+      skinItem.classList.contains("active-skin");
     if (!championLocked && !isSwiftplay) {
       // Remove existing button if champion is not locked (and not Swiftplay)
-      let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+      const existingButton = skinItem.querySelector(BUTTON_SELECTOR);
       if (existingButton) {
         existingButton.remove();
       }
@@ -2004,20 +1992,12 @@
     const isCurrent = isCurrentSkinItem(skinItem);
     const currentSkinId = skinMonitorState?.skinId ?? null;
     const hasChromas = Boolean(
-      skinMonitorState?.hasChromas ||
-        isSpecialBaseSkin(currentSkinId)
+      skinMonitorState?.hasChromas || isSpecialBaseSkin(currentSkinId)
       // Note: Mordekaiser (82054) and Spirit Blossom Morgana (25080) removed - handled by ROSE-FormsWheel
     );
 
     // Check if button already exists
-    // For Swiftplay, also check inside the chroma modal container
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
-    if (!existingButton && skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
-      const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
-      if (chromaModal) {
-        existingButton = chromaModal.querySelector(BUTTON_SELECTOR);
-      }
-    }
 
     // Debug logging for troubleshooting - only log when state changes
     if (isCurrent) {
@@ -2046,17 +2026,6 @@
     if (!isCurrent) {
       if (existingButton) {
         existingButton.remove();
-      } else {
-        // Also check chroma modal for Swiftplay if button not found in main container
-        if (skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
-          const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
-          if (chromaModal) {
-            const buttonInModal = chromaModal.querySelector(BUTTON_SELECTOR);
-            if (buttonInModal) {
-              buttonInModal.remove();
-            }
-          }
-        }
       }
       return;
     }
@@ -2080,21 +2049,19 @@
     try {
       if (!existingButton) {
         const fakeButton = createFakeButton();
-        
-        // For Swiftplay mode (thumbnail-wrapper with active-skin), place button in chroma modal container
-        if (skinItem.classList.contains("thumbnail-wrapper") && skinItem.classList.contains("active-skin")) {
-          const chromaModal = skinItem.querySelector(".shared-skin-chroma-modal");
-          if (chromaModal) {
-            // Place button inside the chroma modal container (where .chroma.icon is)
-            chromaModal.appendChild(fakeButton);
-            existingButton = fakeButton;
-            log.debug(`[ChromaWheel] Placed button in Swiftplay chroma modal for skin ${currentSkinId}`);
-          } else {
-            // Fallback: append to thumbnail-wrapper if chroma modal not found
-            skinItem.appendChild(fakeButton);
-            existingButton = fakeButton;
-            log.warn(`[ChromaWheel] Chroma modal not found, placed button on thumbnail-wrapper for skin ${currentSkinId}`);
-          }
+
+        // For Swiftplay mode (thumbnail-wrapper with active-skin), place button directly on thumbnail-wrapper
+        // (as a sibling to .related, not inside .shared-skin-chroma-modal)
+        if (
+          skinItem.classList.contains("thumbnail-wrapper") &&
+          skinItem.classList.contains("active-skin")
+        ) {
+          // Always place directly on thumbnail-wrapper for Swiftplay (same as the working case)
+          skinItem.appendChild(fakeButton);
+          existingButton = fakeButton;
+          log.debug(
+            `[ChromaWheel] Placed button on Swiftplay thumbnail-wrapper for skin ${currentSkinId}`
+          );
         } else {
           // Normal champ select: append directly to skin item
           skinItem.appendChild(fakeButton);
@@ -3385,10 +3352,8 @@
       // HOL chromas are now handled by ROSE-FormsWheel
       const isDefault =
         !selectedChromaData ||
-        (selectedChromaData.name === "Default" &&
-          !isElementalistLux) ||
-        (!selectedChromaData.primaryColor &&
-          !isElementalistLux) ||
+        (selectedChromaData.name === "Default" && !isElementalistLux) ||
+        (!selectedChromaData.primaryColor && !isElementalistLux) ||
         selectedChromaData.id === 0;
 
       if (isDefault) {
