@@ -14,8 +14,8 @@
     ".skin-name-text", // Classic Champ Select
     ".skin-name", // Swiftplay lobby
   ];
-  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 25080, 145070, 103085]); // 82054 removed - handled by ROSE-FormsWheel
-  const SPECIAL_CHROMA_SKIN_IDS = new Set([145071, 100001, 103086, 88888]);
+  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 25080]); // 82054, 145070, 103085 removed - handled by ROSE-FormsWheel
+  const SPECIAL_CHROMA_SKIN_IDS = new Set([100001, 88888]); // 145071, 103086 removed - handled by ROSE-FormsWheel
   const chromaParentMap = new Map();
   let skinMonitorState = null;
   const championSkinCache = new Map(); // championId -> Map(skinId -> skin data)
@@ -752,10 +752,7 @@
       return id === 25080 || id === 25999;
     };
 
-    // Check if this is a HOL chroma (Kai'Sa or Ahri)
-    const isHolChroma = (id) => {
-      return id === 145070 || id === 145071 || id === 103085 || id === 103086;
-    };
+    // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel
 
     // Helper to get buttonIconPath for Elementalist Lux forms
     const getButtonIconPathForElementalist = (chromaId) => {
@@ -781,29 +778,7 @@
       return null;
     };
 
-    // Helper to get buttonIconPath for HOL chromas
-    const getButtonIconPathForHol = (chromaId) => {
-      if (isHolChroma(chromaId)) {
-        // Determine base skin ID and champion ID
-        let baseSkinId;
-        let championId;
-
-        if (chromaId === 145070 || chromaId === 145071) {
-          // Kai'Sa HOL
-          baseSkinId = 145070;
-          championId = 145;
-        } else if (chromaId === 103085 || chromaId === 103086) {
-          // Ahri HOL
-          baseSkinId = 103085;
-          championId = 103;
-        } else {
-          return null;
-        }
-
-        return getHolButtonIconPath(championId, chromaId, baseSkinId);
-      }
-      return null;
-    };
+    // Helper to get buttonIconPath for HOL chromas - removed, handled by ROSE-FormsWheel
 
     // Update selectedChromaData based on Python state
     if (data.selectedChromaId && data.chromaColor) {
@@ -934,78 +909,7 @@
         log.debug(
           `[ChromaWheel] Spirit Blossom Morgana form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
-      } else if (isHolChroma(data.selectedChromaId)) {
-        // HOL chroma - get data from local functions
-        let baseSkinId;
-        let championId;
-
-        if (
-          data.selectedChromaId === 145070 ||
-          data.selectedChromaId === 145071
-        ) {
-          // Kai'Sa HOL
-          baseSkinId = 145070;
-          championId = 145;
-        } else if (
-          data.selectedChromaId === 103085 ||
-          data.selectedChromaId === 103086
-        ) {
-          // Ahri HOL
-          baseSkinId = 103085;
-          championId = 103;
-        }
-
-        // Check if it's the base skin or HOL chroma
-        if (data.selectedChromaId === baseSkinId) {
-          // Base skin
-          selectedChromaData = {
-            id: data.selectedChromaId,
-            primaryColor: null,
-            colors: [],
-            name: "Default",
-            buttonIconPath: getHolButtonIconPath(
-              championId,
-              baseSkinId,
-              baseSkinId
-            ),
-          };
-        } else {
-          // HOL chroma
-          const holChromas =
-            championId === 145 ? getKaisaHolChromas() : getAhriHolChromas();
-          const holChroma = holChromas.find(
-            (c) => c.id === data.selectedChromaId
-          );
-          if (holChroma) {
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: holChroma.name || "Selected",
-              buttonIconPath: getHolButtonIconPath(
-                championId,
-                data.selectedChromaId,
-                baseSkinId
-              ),
-            };
-          } else {
-            // HOL chroma not found - use button icon path anyway
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: "Selected",
-              buttonIconPath: getHolButtonIconPath(
-                championId,
-                data.selectedChromaId,
-                baseSkinId
-              ),
-            };
-          }
-        }
-        log.debug(
-          `[ChromaWheel] HOL chroma detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
-        );
+      // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
       } else {
         // Regular chroma - try to find from cache
         // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
@@ -1088,30 +992,7 @@
       // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
       } else if (isMorgana(data.currentSkinId)) {
         buttonIconPath = getMorganaButtonIconPath(data.currentSkinId);
-      } else if (isHolChroma(data.currentSkinId)) {
-        // Determine base skin ID and champion ID for HOL
-        let baseSkinId;
-        let championId;
-
-        if (data.currentSkinId === 145070 || data.currentSkinId === 145071) {
-          baseSkinId = 145070;
-          championId = 145;
-        } else if (
-          data.currentSkinId === 103085 ||
-          data.currentSkinId === 103086
-        ) {
-          baseSkinId = 103085;
-          championId = 103;
-        }
-
-        if (baseSkinId && championId) {
-          buttonIconPath = getHolButtonIconPath(
-            championId,
-            data.currentSkinId,
-            baseSkinId
-          );
-        }
-      }
+      // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
 
       selectedChromaData = {
         id: data.currentSkinId || null,
@@ -1361,27 +1242,7 @@
     return forms;
   }
 
-  // Get Risen Legend Kai'Sa HOL chroma data locally (same as Python's _get_hol_chromas)
-  function getKaisaHolChromas() {
-    const chromas = [
-      { id: 145071, skinId: 145070, name: "Immortalized Legend", colors: [] },
-    ];
-    log.debug(
-      `[getKaisaHolChromas] Created ${chromas.length} Risen Legend Kai'Sa HOL chromas with real skin ID (145071)`
-    );
-    return chromas;
-  }
-
-  // Get Risen Legend Ahri HOL chroma data locally (same as Python's _get_ahri_hol_chromas)
-  function getAhriHolChromas() {
-    const chromas = [
-      { id: 103086, skinId: 103085, name: "Immortalized Legend", colors: [] },
-    ];
-    log.debug(
-      `[getAhriHolChromas] Created ${chromas.length} Risen Legend Ahri HOL chromas with real skin ID (103086)`
-    );
-    return chromas;
-  }
+  // HOL chroma functions removed - now handled by ROSE-FormsWheel
 
   // Get Sahn Uzal Mordekaiser Forms data locally (same as Python's get_mordekaiser_forms)
   function getMordekaiserForms() {
@@ -1468,27 +1329,7 @@
     return path;
   }
 
-  // Get button icon path for HOL chromas (Kai'Sa and Ahri)
-  function getHolButtonIconPath(championId, chromaId, baseSkinId) {
-    // Determine which button icon to use based on chroma ID
-    // Base skins (145070, 103085) use "risen.png"
-    // HOL chromas (145071, 103086) use "immortal.png"
-    let imageName;
-    let folderName;
-
-    if (chromaId === baseSkinId) {
-      // Base skin - use "risen.png"
-      imageName = "risen.png";
-      folderName = championId === 145 ? "kaisa_buttons" : "ahri_buttons";
-    } else {
-      // HOL chroma - use "immortal.png"
-      imageName = "immortal.png";
-      folderName = championId === 145 ? "kaisa_buttons" : "ahri_buttons";
-    }
-
-    const path = `local-asset://${folderName}/${imageName}`;
-    return path;
-  }
+  // getHolButtonIconPath removed - now handled by ROSE-FormsWheel
 
   function isSpecialBaseSkin(skinId) {
     return (
@@ -2567,115 +2408,8 @@
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
-    // SPECIAL CASE: Risen Legend Kai'Sa (skin ID 145070) or Immortalized Legend (145071)
-    if (baseSkinId === 145070 || baseSkinId === 145071) {
-      log.debug(
-        `[getChromaData] Risen Legend Kai'Sa detected (base skin: 145070) - using local HOL chroma data`
-      );
-      const holChromas = getKaisaHolChromas();
-      const actualBaseSkinId = 145070; // Always use base skin ID
-      const kaisaChampionId = 145; // Kai'Sa champion ID
-
-      // Base skin (Risen Legend Kai'Sa)
-      const baseSkinChroma = {
-        id: actualBaseSkinId,
-        name: "Default",
-        imagePath: getLocalPreviewPath(
-          kaisaChampionId,
-          actualBaseSkinId,
-          actualBaseSkinId,
-          true
-        ),
-        colors: [],
-        primaryColor: null,
-        selected: false,
-        locked: false,
-        buttonIconPath: getHolButtonIconPath(
-          kaisaChampionId,
-          actualBaseSkinId,
-          actualBaseSkinId
-        ),
-      };
-
-      // HOL chroma (Immortalized Legend)
-      const holChromaList = holChromas.map((chroma) => ({
-        id: chroma.id,
-        name: chroma.name,
-        imagePath: getLocalPreviewPath(
-          kaisaChampionId,
-          actualBaseSkinId,
-          chroma.id,
-          false
-        ),
-        colors: chroma.colors || [],
-        primaryColor: null,
-        selected: false,
-        locked: false, // HOL chromas are clickable
-        buttonIconPath: getHolButtonIconPath(
-          kaisaChampionId,
-          chroma.id,
-          actualBaseSkinId
-        ),
-      }));
-
-      const allChromas = [baseSkinChroma, ...holChromaList];
-      return markSelectedChroma(allChromas, currentSkinId);
-    }
-
-    // SPECIAL CASE: Risen Legend Ahri (skin ID 103085) or Immortalized Legend (103086)
-    if (baseSkinId === 103085 || baseSkinId === 103086) {
-      log.debug(
-        `[getChromaData] Risen Legend Ahri detected (base skin: 103085) - using local HOL chroma data`
-      );
-      const holChromas = getAhriHolChromas();
-      const actualBaseSkinId = 103085; // Always use base skin ID
-      const ahriChampionId = 103; // Ahri champion ID
-
-      // Base skin (Risen Legend Ahri)
-      const baseSkinChroma = {
-        id: actualBaseSkinId,
-        name: "Default",
-        imagePath: getLocalPreviewPath(
-          ahriChampionId,
-          actualBaseSkinId,
-          actualBaseSkinId,
-          true
-        ),
-        colors: [],
-        primaryColor: null,
-        selected: false,
-        locked: false,
-        buttonIconPath: getHolButtonIconPath(
-          ahriChampionId,
-          actualBaseSkinId,
-          actualBaseSkinId
-        ),
-      };
-
-      // HOL chroma (Immortalized Legend)
-      const holChromaList = holChromas.map((chroma) => ({
-        id: chroma.id,
-        name: chroma.name,
-        imagePath: getLocalPreviewPath(
-          ahriChampionId,
-          actualBaseSkinId,
-          chroma.id,
-          false
-        ),
-        colors: chroma.colors || [],
-        primaryColor: null,
-        selected: false,
-        locked: false, // HOL chromas are clickable
-        buttonIconPath: getHolButtonIconPath(
-          ahriChampionId,
-          chroma.id,
-          actualBaseSkinId
-        ),
-      }));
-
-      const allChromas = [baseSkinChroma, ...holChromaList];
-      return markSelectedChroma(allChromas, currentSkinId);
-    }
+    // SPECIAL CASE: Risen Legend Kai'Sa and Ahri HoL skins are now handled by ROSE-FormsWheel
+    // (removed - handled by ROSE-FormsWheel)
 
     // First, check if chromas are directly in the skinData (like official client)
     // The official client gets chromas from the Ember component context
@@ -3575,18 +3309,12 @@
         selectedChromaData &&
         (selectedChromaData.id === 25080 ||
           selectedChromaData.id === 25999);
-      const isHolChroma =
-        selectedChromaData &&
-        (selectedChromaData.id === 145070 ||
-          selectedChromaData.id === 145071 ||
-          selectedChromaData.id === 103085 ||
-          selectedChromaData.id === 103086);
+      // HOL chromas are now handled by ROSE-FormsWheel
       const isDefault =
         !selectedChromaData ||
         (selectedChromaData.name === "Default" &&
           !isElementalistLux &&
-          !isMorgana &&
-          !isHolChroma) ||
+          !isMorgana) ||
         (!selectedChromaData.primaryColor &&
           !isElementalistLux &&
           !isMorgana &&
