@@ -14,7 +14,7 @@
     ".skin-name-text", // Classic Champ Select
     ".skin-name", // Swiftplay lobby
   ];
-  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 25080]); // 82054, 145070, 103085 removed - handled by ROSE-FormsWheel
+  const SPECIAL_BASE_SKIN_IDS = new Set([99007]); // 82054, 145070, 103085, 25080 removed - handled by ROSE-FormsWheel
   const SPECIAL_CHROMA_SKIN_IDS = new Set([100001, 88888]); // 145071, 103086 removed - handled by ROSE-FormsWheel
   const chromaParentMap = new Map();
   let skinMonitorState = null;
@@ -778,10 +778,10 @@
     };
 
     // Helper to get buttonIconPath for Spirit Blossom Morgana forms
+    // Note: Morgana handling removed - now handled by ROSE-FormsWheel plugin
     const getButtonIconPathForMorgana = (chromaId) => {
-      if (isMorgana(chromaId)) {
-        return getMorganaButtonIconPath(chromaId);
-      }
+      // This function is kept for compatibility but should not be used
+      // Morgana is now handled by ROSE-FormsWheel
       return null;
     };
 
@@ -874,48 +874,7 @@
         log.debug(
           `[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
-        // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
-      } else if (isMorgana(data.selectedChromaId)) {
-        // Spirit Blossom Morgana form - get data from local functions
-        const baseFormId = 25080;
-        const morganaChampionId = 25;
-
-        // Check if it's the base form or a form
-        if (data.selectedChromaId === baseFormId) {
-          // Base form
-          selectedChromaData = {
-            id: data.selectedChromaId,
-            primaryColor: null,
-            colors: [],
-            name: "Default",
-            buttonIconPath: getMorganaButtonIconPath(baseFormId),
-          };
-        } else {
-          // Spirit Blossom Morgana form (25999)
-          const forms = getMorganaForms();
-          const form = forms.find((f) => f.id === data.selectedChromaId);
-          if (form) {
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: form.name || "Selected",
-              buttonIconPath: getMorganaButtonIconPath(form.id),
-            };
-          } else {
-            // Form not found - use button icon path anyway
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: "Selected",
-              buttonIconPath: getMorganaButtonIconPath(data.selectedChromaId),
-            };
-          }
-        }
-        log.debug(
-          `[ChromaWheel] Spirit Blossom Morgana form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
-        );
+        // Note: Mordekaiser (82054) and Spirit Blossom Morgana (25080) handling removed - now handled by ROSE-FormsWheel plugin
         // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
       } else {
         // Regular chroma - try to find from cache
@@ -992,18 +951,15 @@
       }
     } else {
       // Default/base chroma selected
-      // Check if currentSkinId is Elementalist Lux base, Sahn Uzal Mordekaiser base, Spirit Blossom Morgana base, or HOL base
+      // Check if currentSkinId is Elementalist Lux base
       let buttonIconPath = null;
       if (
         data.currentSkinId === 99007 ||
         (data.currentSkinId >= 99991 && data.currentSkinId <= 99999)
       ) {
         buttonIconPath = getElementalistButtonIconPath(data.currentSkinId);
-        // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
-      } else if (isMorgana(data.currentSkinId)) {
-        buttonIconPath = getMorganaButtonIconPath(data.currentSkinId);
       }
-      // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
+      // Note: Mordekaiser (82054), Spirit Blossom Morgana (25080), and HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
 
       selectedChromaData = {
         id: data.currentSkinId || null,
@@ -2024,9 +1980,8 @@
     const currentSkinId = skinMonitorState?.skinId ?? null;
     const hasChromas = Boolean(
       skinMonitorState?.hasChromas ||
-        isSpecialBaseSkin(currentSkinId) ||
-        isMorgana(currentSkinId)
-      // Note: Mordekaiser (82054) removed - handled by ROSE-FormsWheel
+        isSpecialBaseSkin(currentSkinId)
+      // Note: Mordekaiser (82054) and Spirit Blossom Morgana (25080) removed - handled by ROSE-FormsWheel
     );
 
     // Check if button already exists
@@ -2419,56 +2374,8 @@
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
-    // NOTE: Sahn Uzal Mordekaiser (82054) removed - now handled by ROSE-FormsWheel plugin
-    // Previously this special case handled Mordekaiser forms, but it's now excluded from this plugin
-
-    // SPECIAL CASE: Spirit Blossom Morgana (skin ID 25080) - use local Forms data
-    if (baseSkinId === 25080 || baseSkinId === 25999) {
-      log.debug(
-        `[getChromaData] Spirit Blossom Morgana detected (base skin: 25080) - using local Forms data`
-      );
-      const forms = getMorganaForms();
-      const baseFormId = 25080; // Always use base skin ID for Spirit Blossom Morgana
-      const morganaChampionId = 25; // Morgana champion ID
-
-      // Base skin (Spirit Blossom Morgana base)
-      const baseSkinChroma = {
-        id: baseFormId,
-        name: "Default",
-        imagePath: getLocalPreviewPath(
-          morganaChampionId,
-          baseFormId,
-          baseFormId,
-          true
-        ),
-        colors: [],
-        primaryColor: null,
-        selected: false,
-        locked: false,
-        buttonIconPath: getMorganaButtonIconPath(baseFormId),
-      };
-
-      // Forms (ID 25999)
-      const formList = forms.map((form) => ({
-        id: form.id,
-        name: form.name,
-        imagePath: getLocalPreviewPath(
-          morganaChampionId,
-          baseFormId,
-          form.id,
-          false
-        ),
-        colors: form.colors || [],
-        primaryColor: null, // Forms don't have colors
-        selected: false,
-        locked: false, // Forms are clickable (locking is just visual in the official client)
-        buttonIconPath: getMorganaButtonIconPath(form.id),
-        form_path: form.form_path,
-      }));
-
-      const allChromas = [baseSkinChroma, ...formList];
-      return markSelectedChroma(allChromas, currentSkinId);
-    }
+    // NOTE: Sahn Uzal Mordekaiser (82054) and Spirit Blossom Morgana (25080) removed - now handled by ROSE-FormsWheel plugin
+    // Previously these special cases handled Mordekaiser and Morgana forms, but they're now excluded from this plugin
 
     // SPECIAL CASE: Risen Legend Kai'Sa and Ahri HoL skins are now handled by ROSE-FormsWheel
     // (removed - handled by ROSE-FormsWheel)
@@ -3361,24 +3268,19 @@
       }
 
       // Check if this is the default chroma (no color or name is "Default")
-      // BUT: For Elementalist Lux, Spirit Blossom Morgana, and HOL chromas, even the "Default" button should show its icon, not the generic default
-      // Note: Mordekaiser removed - handled by ROSE-FormsWheel
+      // BUT: For Elementalist Lux, even the "Default" button should show its icon, not the generic default
+      // Note: Mordekaiser (82054), Spirit Blossom Morgana (25080), and HOL chromas are now handled by ROSE-FormsWheel
       const isElementalistLux =
         selectedChromaData &&
         (selectedChromaData.id === 99007 ||
           (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999));
-      const isMorgana =
-        selectedChromaData &&
-        (selectedChromaData.id === 25080 || selectedChromaData.id === 25999);
       // HOL chromas are now handled by ROSE-FormsWheel
       const isDefault =
         !selectedChromaData ||
         (selectedChromaData.name === "Default" &&
-          !isElementalistLux &&
-          !isMorgana) ||
+          !isElementalistLux) ||
         (!selectedChromaData.primaryColor &&
-          !isElementalistLux &&
-          !isMorgana) ||
+          !isElementalistLux) ||
         selectedChromaData.id === 0;
 
       if (isDefault) {
