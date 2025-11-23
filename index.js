@@ -14,7 +14,7 @@
     ".skin-name-text", // Classic Champ Select
     ".skin-name", // Swiftplay lobby
   ];
-  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 82054, 25080, 145070, 103085]);
+  const SPECIAL_BASE_SKIN_IDS = new Set([99007, 25080, 145070, 103085]); // 82054 removed - handled by ROSE-FormsWheel
   const SPECIAL_CHROMA_SKIN_IDS = new Set([145071, 100001, 103086, 88888]);
   const chromaParentMap = new Map();
   let skinMonitorState = null;
@@ -890,49 +890,7 @@
         log.debug(
           `[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
-      } else if (isMordekaiser(data.selectedChromaId)) {
-        // Sahn Uzal Mordekaiser form - get data from local functions
-        const baseFormId = 82054;
-        const mordekaiserChampionId = 82;
-
-        // Check if it's the base form or a form
-        if (data.selectedChromaId === baseFormId) {
-          // Base form
-          selectedChromaData = {
-            id: data.selectedChromaId,
-            primaryColor: null,
-            colors: [],
-            name: "Default",
-            buttonIconPath: getMordekaiserButtonIconPath(baseFormId),
-          };
-        } else {
-          // Sahn Uzal Mordekaiser form (82998, 82999)
-          const forms = getMordekaiserForms();
-          const form = forms.find((f) => f.id === data.selectedChromaId);
-          if (form) {
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: form.name || "Selected",
-              buttonIconPath: getMordekaiserButtonIconPath(form.id),
-            };
-          } else {
-            // Form not found - use button icon path anyway
-            selectedChromaData = {
-              id: data.selectedChromaId,
-              primaryColor: null,
-              colors: [],
-              name: "Selected",
-              buttonIconPath: getMordekaiserButtonIconPath(
-                data.selectedChromaId
-              ),
-            };
-          }
-        }
-        log.debug(
-          `[ChromaWheel] Sahn Uzal Mordekaiser form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
-        );
+      // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
       } else if (isMorgana(data.selectedChromaId)) {
         // Spirit Blossom Morgana form - get data from local functions
         const baseFormId = 25080;
@@ -1127,8 +1085,7 @@
       let buttonIconPath = null;
       if (isElementalistLux(data.currentSkinId)) {
         buttonIconPath = getElementalistButtonIconPath(data.currentSkinId);
-      } else if (isMordekaiser(data.currentSkinId)) {
-        buttonIconPath = getMordekaiserButtonIconPath(data.currentSkinId);
+      // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
       } else if (isMorgana(data.currentSkinId)) {
         buttonIconPath = getMorganaButtonIconPath(data.currentSkinId);
       } else if (isHolChroma(data.currentSkinId)) {
@@ -2203,8 +2160,8 @@
     const hasChromas = Boolean(
       skinMonitorState?.hasChromas || 
       isSpecialBaseSkin(currentSkinId) || 
-      isMordekaiser(currentSkinId) ||
       isMorgana(currentSkinId)
+      // Note: Mordekaiser (82054) removed - handled by ROSE-FormsWheel
     );
 
     // Check if button already exists
@@ -2559,53 +2516,8 @@
       return markSelectedChroma(allChromas, currentSkinId);
     }
 
-    // SPECIAL CASE: Sahn Uzal Mordekaiser (skin ID 82054) - use local Forms data
-    if (baseSkinId === 82054 || baseSkinId === 82998 || baseSkinId === 82999) {
-      log.debug(
-        `[getChromaData] Sahn Uzal Mordekaiser detected (base skin: 82054) - using local Forms data`
-      );
-      const forms = getMordekaiserForms();
-      const baseFormId = 82054; // Always use base skin ID for Sahn Uzal Mordekaiser
-      const mordekaiserChampionId = 82; // Mordekaiser champion ID
-
-      // Base skin (Sahn Uzal Mordekaiser base)
-      const baseSkinChroma = {
-        id: baseFormId,
-        name: "Default",
-        imagePath: getLocalPreviewPath(
-          mordekaiserChampionId,
-          baseFormId,
-          baseFormId,
-          true
-        ),
-        colors: [],
-        primaryColor: null,
-        selected: false,
-        locked: false,
-        buttonIconPath: getMordekaiserButtonIconPath(baseFormId),
-      };
-
-      // Forms (IDs 82998, 82999)
-      const formList = forms.map((form) => ({
-        id: form.id,
-        name: form.name,
-        imagePath: getLocalPreviewPath(
-          mordekaiserChampionId,
-          baseFormId,
-          form.id,
-          false
-        ),
-        colors: form.colors || [],
-        primaryColor: null, // Forms don't have colors
-        selected: false,
-        locked: false, // Forms are clickable (locking is just visual in the official client)
-        buttonIconPath: getMordekaiserButtonIconPath(form.id),
-        form_path: form.form_path,
-      }));
-
-      const allChromas = [baseSkinChroma, ...formList];
-      return markSelectedChroma(allChromas, currentSkinId);
-    }
+    // NOTE: Sahn Uzal Mordekaiser (82054) removed - now handled by ROSE-FormsWheel plugin
+    // Previously this special case handled Mordekaiser forms, but it's now excluded from this plugin
 
     // SPECIAL CASE: Spirit Blossom Morgana (skin ID 25080) - use local Forms data
     if (baseSkinId === 25080 || baseSkinId === 25999) {
@@ -3477,7 +3389,8 @@
 
   function updateChromaPreview(chroma, chromaImage) {
     // Update preview image using chroma imagePath
-    // For special skins (Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, HOL chromas), use local preview paths
+    // For special skins (Elementalist Lux, Spirit Blossom Morgana, HOL chromas), use local preview paths
+    // Note: Mordekaiser removed - handled by ROSE-FormsWheel
     // For regular chromas, use LCU API paths
     const imagePath = chroma.imagePath;
 
@@ -3534,7 +3447,8 @@
 
   function updateChromaButtonColor() {
     // Update the chroma button's content background to match selected chroma
-    // For Elementalist Lux forms, Sahn Uzal Mordekaiser forms, and Spirit Blossom Morgana forms: use button icon image
+    // For Elementalist Lux forms and Spirit Blossom Morgana forms: use button icon image
+    // Note: Mordekaiser removed - handled by ROSE-FormsWheel
     // If default chroma (no color), keep the button-chroma.png image
     // If chroma has color, use that color as background
     const buttons = document.querySelectorAll(BUTTON_SELECTOR);
@@ -3547,13 +3461,15 @@
         return;
       }
 
-      // Check if this chroma has a button icon path (Elementalist Lux forms, Sahn Uzal Mordekaiser forms, Spirit Blossom Morgana forms, or HOL chromas)
+      // Check if this chroma has a button icon path (Elementalist Lux forms, Spirit Blossom Morgana forms, or HOL chromas)
+      // Note: Mordekaiser removed - handled by ROSE-FormsWheel
       if (
         selectedChromaData &&
         selectedChromaData.buttonIconPath &&
         selectedChromaData.buttonIconPath.startsWith("local-asset://")
       ) {
-        // Elementalist Lux form, Sahn Uzal Mordekaiser form, Spirit Blossom Morgana form, or HOL chroma - always request the icon to ensure it matches the selected chroma
+        // Elementalist Lux form, Spirit Blossom Morgana form, or HOL chroma - always request the icon to ensure it matches the selected chroma
+        // Note: Mordekaiser removed - handled by ROSE-FormsWheel
         // Track the last applied chroma ID on the button to detect when switching between chromas
         const lastAppliedChromaId = content.getAttribute("data-last-chroma-id");
         const chromaIdChanged =
@@ -3649,16 +3565,12 @@
       }
 
       // Check if this is the default chroma (no color or name is "Default")
-      // BUT: For Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, and HOL chromas, even the "Default" button should show its icon, not the generic default
+      // BUT: For Elementalist Lux, Spirit Blossom Morgana, and HOL chromas, even the "Default" button should show its icon, not the generic default
+      // Note: Mordekaiser removed - handled by ROSE-FormsWheel
       const isElementalistLux =
         selectedChromaData &&
         (selectedChromaData.id === 99007 ||
           (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999));
-      const isMordekaiser =
-        selectedChromaData &&
-        (selectedChromaData.id === 82054 ||
-          selectedChromaData.id === 82998 ||
-          selectedChromaData.id === 82999);
       const isMorgana =
         selectedChromaData &&
         (selectedChromaData.id === 25080 ||
@@ -3673,12 +3585,10 @@
         !selectedChromaData ||
         (selectedChromaData.name === "Default" &&
           !isElementalistLux &&
-          !isMordekaiser &&
           !isMorgana &&
           !isHolChroma) ||
         (!selectedChromaData.primaryColor &&
           !isElementalistLux &&
-          !isMordekaiser &&
           !isMorgana &&
           !isHolChroma) ||
         selectedChromaData.id === 0;
