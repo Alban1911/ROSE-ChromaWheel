@@ -48,9 +48,12 @@
         if (!isNaN(port) && port > 0) {
           // Verify cached port is still valid
           try {
-            const response = await fetch(`http://localhost:${port}/bridge-port`, {
-              signal: AbortSignal.timeout(1000)
-            });
+            const response = await fetch(
+              `http://localhost:${port}/bridge-port`,
+              {
+                signal: AbortSignal.timeout(1000),
+              }
+            );
             if (response.ok) {
               const portText = await response.text();
               const fetchedPort = parseInt(portText.trim(), 10);
@@ -58,7 +61,9 @@
                 BRIDGE_PORT = fetchedPort;
                 BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
                 if (window?.console) {
-                  console.log(`${LOG_PREFIX} Loaded bridge port from cache: ${BRIDGE_PORT}`);
+                  console.log(
+                    `${LOG_PREFIX} Loaded bridge port from cache: ${BRIDGE_PORT}`
+                  );
                 }
                 return true;
               }
@@ -69,12 +74,16 @@
           }
         }
       }
-      
+
       // Discovery: try /bridge-port endpoint on high ports (50000-50010)
-      for (let port = DISCOVERY_START_PORT; port <= DISCOVERY_END_PORT; port++) {
+      for (
+        let port = DISCOVERY_START_PORT;
+        port <= DISCOVERY_END_PORT;
+        port++
+      ) {
         try {
           const response = await fetch(`http://localhost:${port}/bridge-port`, {
-            signal: AbortSignal.timeout(1000)
+            signal: AbortSignal.timeout(1000),
           });
           if (response.ok) {
             const portText = await response.text();
@@ -83,7 +92,10 @@
               BRIDGE_PORT = fetchedPort;
               BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
               // Cache the discovered port
-              localStorage.setItem(BRIDGE_PORT_STORAGE_KEY, String(BRIDGE_PORT));
+              localStorage.setItem(
+                BRIDGE_PORT_STORAGE_KEY,
+                String(BRIDGE_PORT)
+              );
               if (window?.console) {
                 console.log(`${LOG_PREFIX} Loaded bridge port: ${BRIDGE_PORT}`);
               }
@@ -94,12 +106,16 @@
           continue;
         }
       }
-      
+
       // Fallback: try old /port endpoint for backward compatibility
-      for (let port = DISCOVERY_START_PORT; port <= DISCOVERY_END_PORT; port++) {
+      for (
+        let port = DISCOVERY_START_PORT;
+        port <= DISCOVERY_END_PORT;
+        port++
+      ) {
         try {
           const response = await fetch(`http://localhost:${port}/port`, {
-            signal: AbortSignal.timeout(1000)
+            signal: AbortSignal.timeout(1000),
           });
           if (response.ok) {
             const portText = await response.text();
@@ -107,9 +123,14 @@
             if (!isNaN(fetchedPort) && fetchedPort > 0) {
               BRIDGE_PORT = fetchedPort;
               BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
-              localStorage.setItem(BRIDGE_PORT_STORAGE_KEY, String(BRIDGE_PORT));
+              localStorage.setItem(
+                BRIDGE_PORT_STORAGE_KEY,
+                String(BRIDGE_PORT)
+              );
               if (window?.console) {
-                console.log(`${LOG_PREFIX} Loaded bridge port (legacy): ${BRIDGE_PORT}`);
+                console.log(
+                  `${LOG_PREFIX} Loaded bridge port (legacy): ${BRIDGE_PORT}`
+                );
               }
               return true;
             }
@@ -118,7 +139,7 @@
           continue;
         }
       }
-      
+
       if (window?.console) {
         console.warn(
           `${LOG_PREFIX} Failed to load bridge port, using default (50000)`
@@ -737,36 +758,22 @@
       `[ChromaWheel] Received chroma state from Python: selectedChromaId=${data.selectedChromaId}, chromaColor=${data.chromaColor}`
     );
 
-    // Check if this is an Elementalist Lux form (ID 99991-99999 or base 99007)
-    const isElementalistLux = (id) => {
-      return id === 99007 || (id >= 99991 && id <= 99999);
-    };
-
-    // Check if this is a Sahn Uzal Mordekaiser form (IDs 82998, 82999 or base 82054)
-    const isMordekaiser = (id) => {
-      return id === 82054 || id === 82998 || id === 82999;
-    };
-
-    // Check if this is a Spirit Blossom Morgana form (ID 25999 or base 25080)
-    const isMorgana = (id) => {
-      return id === 25080 || id === 25999;
-    };
-
+    // Note: isMordekaiser and isMorgana are global functions defined elsewhere
     // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel
 
     // Helper to get buttonIconPath for Elementalist Lux forms
     const getButtonIconPathForElementalist = (chromaId) => {
-      if (isElementalistLux(chromaId)) {
+      if (chromaId === 99007 || (chromaId >= 99991 && chromaId <= 99999)) {
         return getElementalistButtonIconPath(chromaId);
       }
       return null;
     };
 
     // Helper to get buttonIconPath for Sahn Uzal Mordekaiser forms
+    // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
     const getButtonIconPathForMordekaiser = (chromaId) => {
-      if (isMordekaiser(chromaId)) {
-        return getMordekaiserButtonIconPath(chromaId);
-      }
+      // This function is kept for compatibility but should not be used
+      // Mordekaiser is now handled by ROSE-FormsWheel
       return null;
     };
 
@@ -785,7 +792,6 @@
       // Python provided the color directly
       const buttonIconPath =
         getButtonIconPathForElementalist(data.selectedChromaId) ||
-        getButtonIconPathForHol(data.selectedChromaId) ||
         (selectedChromaData && selectedChromaData.id === data.selectedChromaId
           ? selectedChromaData.buttonIconPath
           : null);
@@ -822,7 +828,10 @@
       }
 
       // Check if this is Elementalist Lux - if so, use local data
-      if (isElementalistLux(data.selectedChromaId)) {
+      if (
+        data.selectedChromaId === 99007 ||
+        (data.selectedChromaId >= 99991 && data.selectedChromaId <= 99999)
+      ) {
         // Elementalist Lux form - get data from local functions
         const baseFormId = 99007;
         const luxChampionId = 99;
@@ -865,7 +874,7 @@
         log.debug(
           `[ChromaWheel] Elementalist Lux form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
-      // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
+        // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
       } else if (isMorgana(data.selectedChromaId)) {
         // Spirit Blossom Morgana form - get data from local functions
         const baseFormId = 25080;
@@ -900,16 +909,14 @@
               primaryColor: null,
               colors: [],
               name: "Selected",
-              buttonIconPath: getMorganaButtonIconPath(
-                data.selectedChromaId
-              ),
+              buttonIconPath: getMorganaButtonIconPath(data.selectedChromaId),
             };
           }
         }
         log.debug(
           `[ChromaWheel] Spirit Blossom Morgana form detected: ${data.selectedChromaId}, buttonIconPath: ${selectedChromaData.buttonIconPath}`
         );
-      // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
+        // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
       } else {
         // Regular chroma - try to find from cache
         // Fallback: try to infer base skin ID from chroma ID (chroma IDs are typically baseSkinId + offset)
@@ -987,11 +994,15 @@
       // Default/base chroma selected
       // Check if currentSkinId is Elementalist Lux base, Sahn Uzal Mordekaiser base, Spirit Blossom Morgana base, or HOL base
       let buttonIconPath = null;
-      if (isElementalistLux(data.currentSkinId)) {
+      if (
+        data.currentSkinId === 99007 ||
+        (data.currentSkinId >= 99991 && data.currentSkinId <= 99999)
+      ) {
         buttonIconPath = getElementalistButtonIconPath(data.currentSkinId);
-      // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
+        // Note: Mordekaiser handling removed - now handled by ROSE-FormsWheel plugin
       } else if (isMorgana(data.currentSkinId)) {
         buttonIconPath = getMorganaButtonIconPath(data.currentSkinId);
+      }
       // HOL chromas (Kai'Sa and Ahri) are now handled by ROSE-FormsWheel - skip here
 
       selectedChromaData = {
@@ -1079,6 +1090,10 @@
     debug: (msg, extra) => {
       console.debug(`${LOG_PREFIX} ${msg}`, extra ?? "");
       emitBridgeLog("debug", { message: msg, data: extra });
+    },
+    error: (msg, extra) => {
+      console.error(`${LOG_PREFIX} ${msg}`, extra ?? "");
+      emitBridgeLog("error", { message: msg, data: extra });
     },
   };
 
@@ -1346,10 +1361,7 @@
   }
 
   function isMorgana(skinId) {
-    return (
-      Number.isFinite(skinId) &&
-      (skinId === 25080 || skinId === 25999)
-    );
+    return Number.isFinite(skinId) && (skinId === 25080 || skinId === 25999);
   }
 
   function isSpecialChromaSkin(skinId) {
@@ -1927,6 +1939,18 @@
       if (offset === 2) {
         return true;
       }
+      // Fallback: if we can't determine offset but this skin matches the current skin state, consider it current
+      // This helps when offset detection fails but we know this is the selected skin
+      if (skinMonitorState?.skinId) {
+        const skinData = getCachedSkinData(skinItem);
+        const skinId = getSkinIdFromContext(skinData, skinItem);
+        if (Number.isFinite(skinId) && skinId === skinMonitorState.skinId) {
+          log.debug(
+            `[ChromaWheel] Using fallback: skin ${skinId} matches current skin state (offset detection returned ${offset})`
+          );
+          return true;
+        }
+      }
     }
 
     // Thumbnail wrappers (e.g., Swiftplay lobby) typically flag selection via attributes/classes
@@ -1999,14 +2023,28 @@
     const isCurrent = isCurrentSkinItem(skinItem);
     const currentSkinId = skinMonitorState?.skinId ?? null;
     const hasChromas = Boolean(
-      skinMonitorState?.hasChromas || 
-      isSpecialBaseSkin(currentSkinId) || 
-      isMorgana(currentSkinId)
+      skinMonitorState?.hasChromas ||
+        isSpecialBaseSkin(currentSkinId) ||
+        isMorgana(currentSkinId)
       // Note: Mordekaiser (82054) removed - handled by ROSE-FormsWheel
     );
 
     // Check if button already exists
     let existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+
+    // Debug logging for troubleshooting - use both log and bridge for visibility
+    if (isCurrent) {
+      log.info(
+        `[ChromaWheel] Current skin item found: skinId=${currentSkinId}, hasChromas=${hasChromas}, championLocked=${championLocked}, existingButton=${!!existingButton}`
+      );
+      emitBridgeLog("current_skin_item_found", {
+        skinId: currentSkinId,
+        hasChromas,
+        championLocked,
+        existingButton: !!existingButton,
+      });
+    }
+
     if (!isCurrent) {
       if (existingButton) {
         existingButton.remove();
@@ -2035,10 +2073,19 @@
         const fakeButton = createFakeButton();
         skinItem.appendChild(fakeButton);
         existingButton = fakeButton;
+        log.info(
+          `[ChromaWheel] Created chroma button for skin ${currentSkinId} (hasChromas: ${hasChromas})`
+        );
         emitBridgeLog("button_created", {
           skinId: currentSkinId,
           hasChromas,
+          isSupported: true,
+          championLocked: championLocked,
         });
+      } else {
+        log.info(
+          `[ChromaWheel] Button already exists for skin ${currentSkinId}, updating visibility`
+        );
       }
 
       updateButtonVisibility(existingButton, hasChromas);
@@ -2071,9 +2118,24 @@
       scanSkinSelection._lastState = currentState;
     }
 
+    // Debug: Check for current skin item - use info level for visibility
+    let currentItemFound = false;
     skinItems.forEach((skinItem) => {
+      const offset = getSkinOffset(skinItem);
+      if (offset === 2) {
+        currentItemFound = true;
+        log.info(
+          `[ChromaWheel] Found current skin item with offset 2, hasChromas: ${skinMonitorState?.hasChromas}, championLocked: ${championLocked}`
+        );
+      }
       ensureFakeButton(skinItem);
     });
+
+    if (!currentItemFound && skinItems.length > 0) {
+      log.warn(
+        `[ChromaWheel] Warning: No skin item with offset 2 found, but ${skinItems.length} items exist`
+      );
+    }
 
     thumbnailWrappers.forEach((thumbnailWrapper) => {
       ensureFakeButton(thumbnailWrapper);
@@ -3307,8 +3369,7 @@
           (selectedChromaData.id >= 99991 && selectedChromaData.id <= 99999));
       const isMorgana =
         selectedChromaData &&
-        (selectedChromaData.id === 25080 ||
-          selectedChromaData.id === 25999);
+        (selectedChromaData.id === 25080 || selectedChromaData.id === 25999);
       // HOL chromas are now handled by ROSE-FormsWheel
       const isDefault =
         !selectedChromaData ||
@@ -3317,8 +3378,7 @@
           !isMorgana) ||
         (!selectedChromaData.primaryColor &&
           !isElementalistLux &&
-          !isMorgana &&
-          !isHolChroma) ||
+          !isMorgana) ||
         selectedChromaData.id === 0;
 
       if (isDefault) {
@@ -3905,10 +3965,7 @@
 
   if (typeof document === "undefined") {
     log.warn("document unavailable; aborting");
-    return;
-  }
-
-  if (document.readyState === "loading") {
+  } else if (document.readyState === "loading") {
     document.addEventListener(
       "DOMContentLoaded",
       () => {
