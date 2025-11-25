@@ -15,7 +15,9 @@
     ".skin-name", // Swiftplay lobby
   ];
   const SPECIAL_BASE_SKIN_IDS = new Set([99007]); // 82054, 145070, 103085, 25080 removed - handled by ROSE-FormsWheel
-  const SPECIAL_CHROMA_SKIN_IDS = new Set([100001, 88888]); // 145071, 103086 removed - handled by ROSE-FormsWheel
+  const SPECIAL_CHROMA_SKIN_IDS = new Set([100001, 88888]); // 145071, 103086, 103087 removed - handled by ROSE-FormsWheel
+  // HOL skins handled by ROSE-FormsWheel (should not show ChromaWheel buttons)
+  const HOL_SKIN_IDS = new Set([145070, 145071, 103085, 103086, 103087]);
   const chromaParentMap = new Map();
   let skinMonitorState = null;
   const championSkinCache = new Map(); // championId -> Map(skinId -> skin data)
@@ -2007,9 +2009,20 @@
 
     const isCurrent = isCurrentSkinItem(skinItem);
     const currentSkinId = skinMonitorState?.skinId ?? null;
+    
+    // Skip HOL skins - they are handled by ROSE-FormsWheel
+    if (currentSkinId && HOL_SKIN_IDS.has(currentSkinId)) {
+      // Remove existing button if it exists (shouldn't be there, but clean up just in case)
+      const existingButton = skinItem.querySelector(BUTTON_SELECTOR);
+      if (existingButton) {
+        existingButton.remove();
+      }
+      return;
+    }
+    
     const hasChromas = Boolean(
       skinMonitorState?.hasChromas || isSpecialBaseSkin(currentSkinId)
-      // Note: Mordekaiser (82054) and Spirit Blossom Morgana (25080) removed - handled by ROSE-FormsWheel
+      // Note: Mordekaiser (82054), Spirit Blossom Morgana (25080), and HOL skins removed - handled by ROSE-FormsWheel
     );
 
     // Check if button already exists
@@ -3581,6 +3594,13 @@
 
   function toggleChromaPanel(buttonElement, skinItem) {
     log.info("[ChromaWheel] toggleChromaPanel called");
+    
+    // Don't open panel for HOL skins - they are handled by ROSE-FormsWheel
+    const currentSkinId = skinMonitorState?.skinId ?? null;
+    if (currentSkinId && HOL_SKIN_IDS.has(currentSkinId)) {
+      log.debug(`[ChromaWheel] Skipping panel for HOL skin ${currentSkinId} (handled by FormsWheel)`);
+      return;
+    }
 
     // Check if chroma button exists and is visible before allowing panel to open
     if (!buttonElement) {
