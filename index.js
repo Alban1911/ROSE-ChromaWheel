@@ -196,11 +196,11 @@
       list-style-type: none;
       cursor: pointer;
       display: block !important;
-      bottom: 1px;
+      bottom: 60px !important;
       height: 25px;
       left: 50%;
       position: absolute;
-      transform: translateX(-50%) translateY(50%);
+      transform: translateX(-50%) !important;
       width: 25px;
       z-index: 10;
     }
@@ -285,10 +285,10 @@
       height: 28px;
       width: 28px;
       /* Keep the same positioning as base button for consistency */
-      bottom: 1px;
+      bottom: 60px !important;
       left: 50%;
       position: absolute;
-      transform: translateX(-50%) translateY(50%);
+      transform: translateX(-50%) !important;
       z-index: 10;
     }
 
