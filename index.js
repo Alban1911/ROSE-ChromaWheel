@@ -104,9 +104,10 @@
 
       // OPTIMIZATION: Parallel port discovery instead of sequential
       // Try all ports at once, return as soon as one succeeds
+      // Start at DISCOVERY_START_PORT + 1 since 50000 was already tested above
       const portPromises = [];
       for (
-        let port = DISCOVERY_START_PORT;
+        let port = DISCOVERY_START_PORT + 1;
         port <= DISCOVERY_END_PORT;
         port++
       ) {
@@ -148,9 +149,10 @@
       }
 
       // Fallback: try old /port endpoint (parallel as well)
+      // Start at DISCOVERY_START_PORT + 1 since 50000 was already tested above
       const legacyPromises = [];
       for (
-        let port = DISCOVERY_START_PORT;
+        let port = DISCOVERY_START_PORT + 1;
         port <= DISCOVERY_END_PORT;
         port++
       ) {
