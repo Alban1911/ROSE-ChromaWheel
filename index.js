@@ -54,7 +54,7 @@
             const response = await fetch(
               `http://127.0.0.1:${port}/bridge-port`,
               {
-                signal: AbortSignal.timeout(200),
+                signal: AbortSignal.timeout(50),
               }
             );
             if (response.ok) {
@@ -81,7 +81,7 @@
       // OPTIMIZATION: Try default port 50000 FIRST before scanning all ports
       try {
         const response = await fetch(`http://127.0.0.1:50000/bridge-port`, {
-          signal: AbortSignal.timeout(200),
+          signal: AbortSignal.timeout(50),
         });
         if (response.ok) {
           const portText = await response.text();
@@ -138,7 +138,7 @@
       ) {
         portPromises.push(
           fetch(`http://127.0.0.1:${port}/bridge-port`, {
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.timeout(100),
           })
             .then((response) => {
               if (response.ok) {
@@ -182,7 +182,7 @@
       ) {
         legacyPromises.push(
           fetch(`http://127.0.0.1:${port}/port`, {
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.timeout(100),
           })
             .then((response) => {
               if (response.ok) {
