@@ -6,6 +6,7 @@
  */
 (function createFakeChromaButton() {
   const LOG_PREFIX = "[LU-ChromaButton]";
+  console.log(`${LOG_PREFIX} JS Loaded`);
   const BUTTON_CLASS = "lu-chroma-button";
   const BUTTON_SELECTOR = `.${BUTTON_CLASS}`;
   const PANEL_CLASS = "lu-chroma-panel";
@@ -32,7 +33,7 @@
 
   // WebSocket bridge for sending chroma selection to Python
   let BRIDGE_PORT = 50000; // Default, will be updated from /bridge-port endpoint
-  let BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+  let BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
   const BRIDGE_PORT_STORAGE_KEY = "rose_bridge_port";
   const DISCOVERY_START_PORT = 50000;
   const DISCOVERY_END_PORT = 50010;
@@ -51,7 +52,7 @@
           // Verify cached port is still valid with shorter timeout
           try {
             const response = await fetch(
-              `http://localhost:${port}/bridge-port`,
+              `http://127.0.0.1:${port}/bridge-port`,
               {
                 signal: AbortSignal.timeout(200),
               }
@@ -61,7 +62,7 @@
               const fetchedPort = parseInt(portText.trim(), 10);
               if (!isNaN(fetchedPort) && fetchedPort > 0) {
                 BRIDGE_PORT = fetchedPort;
-                BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+                BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
                 if (window?.console) {
                   console.log(
                     `${LOG_PREFIX} Loaded bridge port from cache: ${BRIDGE_PORT}`
@@ -79,7 +80,7 @@
 
       // OPTIMIZATION: Try default port 50000 FIRST before scanning all ports
       try {
-        const response = await fetch(`http://localhost:50000/bridge-port`, {
+        const response = await fetch(`http://127.0.0.1:50000/bridge-port`, {
           signal: AbortSignal.timeout(200),
         });
         if (response.ok) {
@@ -87,7 +88,7 @@
           const fetchedPort = parseInt(portText.trim(), 10);
           if (!isNaN(fetchedPort) && fetchedPort > 0) {
             BRIDGE_PORT = fetchedPort;
-            BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+            BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
             localStorage.setItem(
               BRIDGE_PORT_STORAGE_KEY,
               String(BRIDGE_PORT)
@@ -102,18 +103,42 @@
         // Port 50000 not ready, continue to discovery
       }
 
+      // OPTIMIZATION: Try fallback port 50001 SECOND
+      try {
+        const response = await fetch(`http://127.0.0.1:50001/bridge-port`, {
+          signal: AbortSignal.timeout(200),
+        });
+        if (response.ok) {
+          const portText = await response.text();
+          const fetchedPort = parseInt(portText.trim(), 10);
+          if (!isNaN(fetchedPort) && fetchedPort > 0) {
+            BRIDGE_PORT = fetchedPort;
+            BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
+            localStorage.setItem(
+              BRIDGE_PORT_STORAGE_KEY,
+              String(BRIDGE_PORT)
+            );
+            if (window?.console) {
+              console.log(`${LOG_PREFIX} Loaded bridge port: ${BRIDGE_PORT}`);
+            }
+            return true;
+          }
+        }
+      } catch (e) {
+        // Port 50001 not ready, continue to discovery
+      }
+
       // OPTIMIZATION: Parallel port discovery instead of sequential
       // Try all ports at once, return as soon as one succeeds
-      // Start at DISCOVERY_START_PORT + 1 since 50000 was already tested above
       const portPromises = [];
       for (
-        let port = DISCOVERY_START_PORT + 1;
+        let port = DISCOVERY_START_PORT;
         port <= DISCOVERY_END_PORT;
         port++
       ) {
         portPromises.push(
-          fetch(`http://localhost:${port}/bridge-port`, {
-            signal: AbortSignal.timeout(300),
+          fetch(`http://127.0.0.1:${port}/bridge-port`, {
+            signal: AbortSignal.timeout(1000),
           })
             .then((response) => {
               if (response.ok) {
@@ -136,7 +161,7 @@
       for (const result of results) {
         if (result.status === "fulfilled" && result.value) {
           BRIDGE_PORT = result.value.port;
-          BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+          BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
           localStorage.setItem(
             BRIDGE_PORT_STORAGE_KEY,
             String(BRIDGE_PORT)
@@ -149,16 +174,15 @@
       }
 
       // Fallback: try old /port endpoint (parallel as well)
-      // Start at DISCOVERY_START_PORT + 1 since 50000 was already tested above
       const legacyPromises = [];
       for (
-        let port = DISCOVERY_START_PORT + 1;
+        let port = DISCOVERY_START_PORT;
         port <= DISCOVERY_END_PORT;
         port++
       ) {
         legacyPromises.push(
-          fetch(`http://localhost:${port}/port`, {
-            signal: AbortSignal.timeout(300),
+          fetch(`http://127.0.0.1:${port}/port`, {
+            signal: AbortSignal.timeout(1000),
           })
             .then((response) => {
               if (response.ok) {
@@ -180,7 +204,7 @@
       for (const result of legacyResults) {
         if (result.status === "fulfilled" && result.value) {
           BRIDGE_PORT = result.value.port;
-          BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+          BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
           localStorage.setItem(
             BRIDGE_PORT_STORAGE_KEY,
             String(BRIDGE_PORT)
@@ -773,7 +797,11 @@
 
   function handleLocalAssetUrl(data) {
     // Handle local asset URL response from Python
-    const { assetPath, chromaId, url } = data;
+    let { assetPath, chromaId, url } = data;
+    // Fix: Ensure we use 127.0.0.1 for asset URLs to match the bridge connection
+    if (url && typeof url === 'string') {
+      url = url.replace('localhost', '127.0.0.1');
+    }
     log.debug(
       `[ChromaWheel] Received local asset URL: ${url} for chroma ${chromaId}`
     );
@@ -965,8 +993,7 @@
             (c) => c.id === data.selectedChromaId
           );
           log.debug(
-            `[ChromaWheel] Looking for chroma ${
-              data.selectedChromaId
+            `[ChromaWheel] Looking for chroma ${data.selectedChromaId
             } in base skin ${baseSkinId}, found: ${foundChroma ? "yes" : "no"}`
           );
         }
@@ -976,7 +1003,7 @@
           const buttonIconPath =
             foundChroma.buttonIconPath ||
             (selectedChromaData &&
-            selectedChromaData.id === data.selectedChromaId
+              selectedChromaData.id === data.selectedChromaId
               ? selectedChromaData.buttonIconPath
               : null);
           selectedChromaData = {
@@ -1621,8 +1648,7 @@
           storeChampionSkins(championId, data.skins);
           const cacheEntry = championSkinCache.get(championId);
           log.debug(
-            `Champion ${championId} skin data cached (${
-              cacheEntry ? cacheEntry.size : 0
+            `Champion ${championId} skin data cached (${cacheEntry ? cacheEntry.size : 0
             } skins)`
           );
           return championSkinCache.get(championId);
@@ -2061,7 +2087,7 @@
 
     const isCurrent = isCurrentSkinItem(skinItem);
     const currentSkinId = skinMonitorState?.skinId ?? null;
-    
+
     // Skip HOL skins - they are handled by ROSE-FormsWheel
     if (currentSkinId && HOL_SKIN_IDS.has(currentSkinId)) {
       // Remove existing button if it exists (shouldn't be there, but clean up just in case)
@@ -2071,7 +2097,7 @@
       }
       return;
     }
-    
+
     const hasChromas = Boolean(
       skinMonitorState?.hasChromas || isSpecialBaseSkin(currentSkinId)
       // Note: Mordekaiser (82054), Spirit Blossom Morgana (25080), and HOL skins removed - handled by ROSE-FormsWheel
@@ -2361,8 +2387,7 @@
             // The official client has chromas in the skin object from Ember context
             if (skin.chromas || skin.childSkins) {
               log.debug(
-                `[getSkinData] Found chromas in Ember context: ${
-                  (skin.chromas || skin.childSkins)?.length || 0
+                `[getSkinData] Found chromas in Ember context: ${(skin.chromas || skin.childSkins)?.length || 0
                 } chromas`
               );
             }
@@ -2471,7 +2496,7 @@
     // This ensures we show the correct selected chroma even if skinMonitorState has the base skin ID
     const currentSkinId =
       pythonChromaState?.selectedChromaId !== null &&
-      pythonChromaState?.selectedChromaId !== undefined
+        pythonChromaState?.selectedChromaId !== undefined
         ? pythonChromaState.selectedChromaId
         : skinMonitorState?.skinId || null;
 
@@ -2977,11 +3002,9 @@
       emberView.className = "ember-view";
 
       const chromaButton = document.createElement("div");
-      chromaButton.className = `chroma-skin-button ${
-        chroma.locked ? "locked" : ""
-      } ${chroma.selected ? "selected" : ""} ${
-        chroma.purchaseDisabled ? "purchase-disabled" : ""
-      }`;
+      chromaButton.className = `chroma-skin-button ${chroma.locked ? "locked" : ""
+        } ${chroma.selected ? "selected" : ""} ${chroma.purchaseDisabled ? "purchase-disabled" : ""
+        }`;
 
       const contents = document.createElement("div");
       contents.className = "contents";
@@ -3018,8 +3041,7 @@
         contents.style.backgroundPosition = "center";
         contents.style.backgroundRepeat = "no-repeat";
         log.debug(
-          `[ChromaWheel] Button ${index + 1}: ${
-            chroma.name
+          `[ChromaWheel] Button ${index + 1}: ${chroma.name
           } - using local button icon (placeholder until Python serves)`
         );
       } else {
@@ -3037,8 +3059,7 @@
           contents.style.backgroundPosition = "center";
           contents.style.backgroundRepeat = "no-repeat";
           log.debug(
-            `[ChromaWheel] Button ${index + 1}: ${
-              chroma.name
+            `[ChromaWheel] Button ${index + 1}: ${chroma.name
             } - using default gradient`
           );
         } else {
@@ -3054,8 +3075,7 @@
             contents.style.backgroundColor = color;
             contents.style.background = color;
             log.debug(
-              `[ChromaWheel] Button ${index + 1}: ${
-                chroma.name
+              `[ChromaWheel] Button ${index + 1}: ${chroma.name
               } with color ${color}`
             );
           } else if (chroma.imagePath) {
@@ -3065,8 +3085,7 @@
             contents.style.backgroundPosition = "center";
             contents.style.backgroundRepeat = "no-repeat";
             log.debug(
-              `[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${
-                chroma.imagePath
+              `[ChromaWheel] Button ${index + 1}: ${chroma.name} with image ${chroma.imagePath
               }`
             );
           } else {
@@ -3077,8 +3096,7 @@
             contents.style.backgroundPosition = "center";
             contents.style.backgroundRepeat = "no-repeat";
             log.debug(
-              `[ChromaWheel] Button ${index + 1}: ${
-                chroma.name
+              `[ChromaWheel] Button ${index + 1}: ${chroma.name
               } - no color or image, using default`
             );
           }
@@ -3549,8 +3567,7 @@
       const firstButton = buttons[0];
       const isSwiftplay = firstButton.closest(".thumbnail-wrapper.active-skin");
       log.debug(
-        `[ChromaWheel] Updated ${buttons.length} button(s) ${
-          isSwiftplay ? "(Swiftplay mode)" : "(normal champ select)"
+        `[ChromaWheel] Updated ${buttons.length} button(s) ${isSwiftplay ? "(Swiftplay mode)" : "(normal champ select)"
         }`
       );
     }
@@ -3646,7 +3663,7 @@
 
   function toggleChromaPanel(buttonElement, skinItem) {
     log.info("[ChromaWheel] toggleChromaPanel called");
-    
+
     // Don't open panel for HOL skins - they are handled by ROSE-FormsWheel
     const currentSkinId = skinMonitorState?.skinId ?? null;
     if (currentSkinId && HOL_SKIN_IDS.has(currentSkinId)) {
@@ -3746,8 +3763,7 @@
       skinItem
     );
     log.info(
-      `[ChromaWheel] Champion ID: ${championId}, Cache has data: ${
-        championId ? championSkinCache.has(championId) : "N/A"
+      `[ChromaWheel] Champion ID: ${championId}, Cache has data: ${championId ? championSkinCache.has(championId) : "N/A"
       }`
     );
     if (championId) {
